@@ -23,6 +23,10 @@
    - `scripts/build_exe.ps1`
    - собран `dist\FileCompareTC.exe`
 6. **Docs** обновлены под сценарий Total Commander.
+7. **Git** инициализирован локально:
+   - основная ветка `main`
+   - стартовый snapshot-коммит создан
+   - workflow описан в `docs/GIT_WORKFLOW.md`
 
 ### ✅ Что уже проверено
 

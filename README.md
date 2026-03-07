@@ -61,3 +61,6 @@ Check code style:
 ```bash
 ruff check file_compare tests
 ```
+
+Git workflow reference:
+[docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md)
