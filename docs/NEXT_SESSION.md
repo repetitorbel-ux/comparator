@@ -33,6 +33,7 @@
    - каждая новая задача начинается с новой осмысленно названной ветки
    - основная ветка `main` синхронизируется с GitHub
    - merge на GitHub остаётся основным путём
+   - preferred path через `gh pr create` / `gh pr merge` уже добавлен в `docs/GIT_WORKFLOW.md`
    - локальный `ff-only` merge в `main` описан как fallback, если GitHub/`gh` недоступны
    - для `git pull` / `git push` / удаления remote-веток зафиксировано правило повторного запуска вне sandbox при типичных ошибках среды
 
@@ -63,7 +64,7 @@ dist\FileCompareTC.exe
 Текущий контекст разработки:
 - ветка: `main`
 - `main` синхронизирован с `origin/main`
-- HEAD: `8da91a5` (`Add fallback policy for local ff-only merges`)
+- HEAD: `cd761e6` (`Merge pull request #2 from repetitorbel-ux/docs/add-gh-workflow-commands`)
 - рабочее дерево чистое
 
 ### 🔧 Полезные команды
