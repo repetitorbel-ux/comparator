@@ -114,6 +114,24 @@ After push:
 - create a pull request into `main`
 - merge on GitHub, not locally
 
+## Sandbox notes for git commands
+
+Most local editing work can stay inside sandbox, but some git commands may fail there because of
+network access, credential prompts, or shell subprocess restrictions.
+
+Typical failure signs:
+
+- `Win32 error 5`
+- `prompt script failure`
+- `could not read Username`
+- `permission denied` around git credential or shell helper processes
+
+Practical rule:
+
+- if `git pull`, `git push`, remote branch deletion, or GitHub CLI commands fail with these symptoms,
+  rerun them with escalation outside sandbox
+- do not treat that as a repo problem by default; first suspect environment restrictions
+
 ## After GitHub merge
 
 Once the branch is merged on GitHub:
