@@ -148,6 +148,30 @@ Optional cleanup of the remote branch:
 git push origin --delete feature/<short-task-name>
 ```
 
+## Fallback when GitHub merge is unavailable
+
+Primary path is still merge on GitHub. Use this fallback only when GitHub PR merge is temporarily
+blocked (for example: `gh` auth issues, unavailable web session, or environment restrictions).
+
+Fallback procedure:
+
+1. Sync `main` first:
+   - `git checkout main`
+   - `git pull origin main`
+2. Merge locally with fast-forward only:
+   - `git merge --ff-only <task-branch>`
+3. Push updated `main`:
+   - `git push origin main`
+4. Clean up the merged branch:
+   - `git branch -d <task-branch>`
+   - optional: `git push origin --delete <task-branch>`
+
+Fallback constraints:
+
+- allowed only for clean, linear history (`--ff-only`)
+- no conflict-resolution merge commits in fallback mode
+- if `--ff-only` is not possible, stop and return to normal GitHub PR merge flow
+
 ## Rules for `main`
 
 - do not commit directly to `main`
