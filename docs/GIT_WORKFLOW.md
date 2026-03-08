@@ -11,6 +11,7 @@
 
 Use this workflow consistently:
 
+- every new task starts in a new branch
 - do not develop directly in local `main`
 - do not merge task branches into local `main`
 - push task branches to GitHub
@@ -22,6 +23,7 @@ In practice:
 - local `main` is a sync branch
 - feature work lives only in `feature/...`, `fix/...`, or `docs/...`
 - GitHub `main` is the canonical stable history
+- one task equals one dedicated branch with a meaningful name
 
 ## Branch naming
 
@@ -52,6 +54,9 @@ git checkout -b feature/tc-button-polish
 
 Important rules:
 
+- every new task must start from a new branch
+- do not reuse an old task branch for unrelated work
+- do not create placeholder branches such as `feature/next-task`
 - start a new branch only from updated `main`
 - keep the working tree clean before switching branches
 - if local `main` has accidental commits, do not continue from it until the situation is resolved

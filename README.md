@@ -52,6 +52,10 @@ The expected executable name is `FileCompareTC`.
 
 ## Development
 
+Branch rule:
+- every new task starts from fresh `main` in a new meaningful branch
+- do not work directly in `main`
+
 Run tests:
 ```bash
 python -m pytest tests/
