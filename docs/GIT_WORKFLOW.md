@@ -114,6 +114,17 @@ After push:
 - create a pull request into `main`
 - merge on GitHub, not locally
 
+Preferred GitHub CLI path:
+
+```bash
+gh pr create --base main --head <task-branch> --title "Short title" --body "Summary"
+gh pr merge --merge --delete-branch
+git checkout main
+git pull origin main
+```
+
+Use this path when `gh` is authenticated and working.
+
 ## Sandbox notes for git commands
 
 Most local editing work can stay inside sandbox, but some git commands may fail there because of
