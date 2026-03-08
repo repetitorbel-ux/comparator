@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Sequence
 
 from PySide6.QtCore import QTimer, Slot
+from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -27,6 +28,7 @@ class MainWindow(QMainWindow):
     def __init__(self, initial_context: LaunchContext | None = None):
         super().__init__()
         self._launch_selection_context = initial_context
+        self._last_compare_context: LaunchContext | None = None
         self._suppress_path_reset = False
         self._launch_compare_timer = QTimer(self)
         self._launch_compare_timer.setSingleShot(True)
@@ -73,6 +75,7 @@ class MainWindow(QMainWindow):
         self.results_view = ResultsView()
         self.results_view.result_selected.connect(self._show_selected_result)
         self.content_compare_view = ContentCompareView()
+        self.content_compare_view.recompare_requested.connect(self._on_recompare_requested)
         main_layout.addWidget(self.results_view)
         main_layout.addWidget(self.content_compare_view, stretch=1)
 
@@ -117,6 +120,7 @@ class MainWindow(QMainWindow):
         if self._suppress_path_reset:
             return
         self._launch_selection_context = None
+        self._last_compare_context = None
         self._apply_selector_mode(None)
 
     def _build_context_from_ui(self) -> LaunchContext:
@@ -144,6 +148,17 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def on_compare(self) -> None:
+        self._run_compare(action_name="starting a new comparison")
+
+    @Slot()
+    def _on_recompare_requested(self) -> None:
+        self._run_compare(action_name="recompare")
+
+    def _run_compare(self, *, action_name: str) -> None:
+        if not self.content_compare_view.confirm_pending_changes(self, action_name=action_name):
+            self.status_bar.showMessage("Comparison canceled.")
+            return
+
         context = self._build_context_for_compare()
         self.status_bar.showMessage("Scanning...")
         QApplication.processEvents()
@@ -159,6 +174,7 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage("Unexpected error occurred.")
             return
 
+        self._last_compare_context = context
         self.results_view.update_results(results)
         if context.uses_file_pair_mode and results:
             self.results_view.select_first_row()
@@ -176,7 +192,14 @@ class MainWindow(QMainWindow):
 
     @Slot(object)
     def _show_selected_result(self, result) -> None:
-        self.content_compare_view.show_result(result)
+        allow_editing = bool(self._last_compare_context and self._last_compare_context.uses_file_pair_mode)
+        self.content_compare_view.show_result(result, allow_editing=allow_editing)
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        if not self.content_compare_view.confirm_pending_changes(self, action_name="closing the window"):
+            event.ignore()
+            return
+        super().closeEvent(event)
 
 
 def main(

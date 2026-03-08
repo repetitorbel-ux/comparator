@@ -1,6 +1,6 @@
 # Next Session: File Compare
 
-## 📅 Статус на 06.03.2026
+## 📅 Статус на 07.03.2026
 
 ### ✅ Что уже реализовано
 1. **Package layout** переведён на `file_compare`.
@@ -12,6 +12,8 @@
    - стартовать как обычное приложение;
    - стартовать из TC-контекста и сразу запускать сравнение.
    - показывать side-by-side diff содержимого для выбранной пары файлов.
+   - включать `Edit Mode` для явной пары файлов, сохранять `Save Left/Save Right` и обновлять diff через `Recompare`.
+   - спрашивать, что делать с unsaved changes перед `Compare`, `Recompare` и закрытием окна.
 4. **CLI launcher** реализован:
    - `--left-file`, `--right-file`
    - `--left-dir`, `--right-dir`
@@ -27,6 +29,9 @@
    - основная ветка `main`
    - стартовый snapshot-коммит создан
    - workflow описан в `docs/GIT_WORKFLOW.md`
+8. **Текущая рабочая ветка**:
+   - `feature/edit-compared-files`
+   - изменения по edit mode ещё не закоммичены и не влиты в `main`
 
 ### ✅ Что уже проверено
 
@@ -37,7 +42,7 @@ ruff check file_compare tests
 ```
 
 Фактический результат:
-- `26 passed`
+- `49 passed`
 - `ruff` без ошибок
 - `PyInstaller` успешно собрал `dist\FileCompareTC.exe`
 
@@ -50,6 +55,10 @@ dist\FileCompareTC.exe
 
 Размер на момент фиксации:
 - `47,155,652 bytes`
+
+Текущий контекст разработки:
+- ветка: `feature/edit-compared-files`
+- рабочее дерево содержит незакоммиченные изменения по edit mode, тестам и документации
 
 ### 🔧 Полезные команды
 
@@ -103,17 +112,27 @@ D:\Development\file_compare_codex\dist\FileCompareTC.exe
 
 ### ⏳ Что делать следующим
 
-#### 1. Ручная проверка в Total Commander
-- проверить кнопку с параметрами `--left-file/--right-file`
-- проверить запуск по hotkey
-- проверить сценарий без selection
-- проверить сценарий с selection в обеих панелях
+#### 1. Зафиксировать edit mode в git
+- просмотреть `git status`
+- сделать коммит в `feature/edit-compared-files`
+- при необходимости влить ветку в `main`
 
-#### 2. Если selection placeholders не сработают
+#### 2. Ручная проверка в Total Commander
+- проверить `Edit Mode` из запуска `--left-file/--right-file`
+- проверить `Save Left` / `Save Right`
+- проверить prompt на unsaved changes при `Recompare`
+- проверить prompt на unsaved changes при закрытии окна
+
+#### 3. Если selection placeholders не сработают
 - уточнить, какие `%`-параметры поддерживает конкретная сборка Total Commander
 - подогнать строку `Parameters` под эту версию
 
-#### 3. Нефункциональные улучшения, если TC-интеграция подтвердится
+#### 4. Нефункциональные улучшения, если TC-интеграция подтвердится
 - hotkey setup documentation
 - иконка/branding для `EXE`
 - UX-полировка GUI
+
+#### 5. Ограничения режима редактирования
+- редактирование доступно только для `--left-file/--right-file`
+- поддерживаются только UTF-8 text files
+- перед `Recompare`, `Compare` и закрытием окна приложение спрашивает, что делать с несохранёнными изменениями
