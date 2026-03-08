@@ -26,22 +26,22 @@ class DiffRow:
 
 
 def read_text_lines(path: Path) -> list[str]:
+    return _decode_for_display(path.read_bytes()).splitlines()
+
+
+def read_editable_text(path: Path) -> str:
     raw_bytes = path.read_bytes()
     if raw_bytes.startswith((b"\xff\xfe", b"\xfe\xff")):
-        encodings = ("utf-16", "utf-8-sig", "utf-8")
-    else:
-        encodings = ("utf-8-sig", "utf-8", "utf-16")
+        raise ValueError("Only UTF-8 text files can be edited.")
+    if b"\x00" in raw_bytes:
+        raise ValueError("Binary files are read-only in edit mode.")
 
-    for encoding in encodings:
-        try:
-            content = raw_bytes.decode(encoding)
-            break
-        except UnicodeError:
-            continue
-    else:
-        content = raw_bytes.decode("latin-1", errors="replace")
+    try:
+        content = raw_bytes.decode("utf-8-sig")
+    except UnicodeError as exc:
+        raise ValueError("Only UTF-8 text files can be edited.") from exc
 
-    return content.splitlines()
+    return content.replace("\r\n", "\n").replace("\r", "\n")
 
 
 def build_side_by_side_rows(left_path: Path, right_path: Path) -> list[DiffRow]:
@@ -181,3 +181,18 @@ def _merge_spans(spans: list[tuple[int, int]]) -> list[tuple[int, int]]:
             continue
         merged.append((start, end))
     return merged
+
+
+def _decode_for_display(raw_bytes: bytes) -> str:
+    if raw_bytes.startswith((b"\xff\xfe", b"\xfe\xff")):
+        encodings = ("utf-16", "utf-8-sig", "utf-8")
+    else:
+        encodings = ("utf-8-sig", "utf-8", "utf-16")
+
+    for encoding in encodings:
+        try:
+            return raw_bytes.decode(encoding)
+        except UnicodeError:
+            continue
+
+    return raw_bytes.decode("latin-1", errors="replace")

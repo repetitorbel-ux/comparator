@@ -18,19 +18,19 @@ class CriteriaPanel(QGroupBox):
         self.name_cb = QCheckBox("Name (Always On)")
         self.name_cb.setChecked(True)
         self.name_cb.setEnabled(False)
-        self.name_cb.toggled.connect(self.criteria_changed.emit)
+        self.name_cb.toggled.connect(lambda _checked=False: self.criteria_changed.emit())
         layout.addWidget(self.name_cb)
 
         self.size_cb = QCheckBox("Size")
-        self.size_cb.toggled.connect(self.criteria_changed.emit)
+        self.size_cb.toggled.connect(lambda _checked=False: self.criteria_changed.emit())
         layout.addWidget(self.size_cb)
 
         self.date_cb = QCheckBox("Date Modified")
-        self.date_cb.toggled.connect(self.criteria_changed.emit)
+        self.date_cb.toggled.connect(lambda _checked=False: self.criteria_changed.emit())
         layout.addWidget(self.date_cb)
 
         self.recursive_cb = QCheckBox("Include subdirectories (Recursive)")
-        self.recursive_cb.toggled.connect(self.criteria_changed.emit)
+        self.recursive_cb.toggled.connect(lambda _checked=False: self.criteria_changed.emit())
         layout.addWidget(self.recursive_cb)
 
         layout.addStretch()
