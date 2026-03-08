@@ -1,6 +1,6 @@
 # Next Session: File Compare
 
-## 📅 Статус на 07.03.2026
+## 📅 Статус на 08.03.2026
 
 ### ✅ Что уже реализовано
 1. **Package layout** переведён на `file_compare`.
@@ -31,7 +31,8 @@
    - workflow описан в `docs/GIT_WORKFLOW.md`
 8. **Текущая рабочая ветка**:
    - `feature/edit-compared-files`
-   - изменения по edit mode ещё не закоммичены и не влиты в `main`
+   - edit mode уже зафиксирован коммитом `07b839b`
+   - ветка ещё не влита в `main`
 
 ### ✅ Что уже проверено
 
@@ -58,7 +59,7 @@ dist\FileCompareTC.exe
 
 Текущий контекст разработки:
 - ветка: `feature/edit-compared-files`
-- рабочее дерево содержит незакоммиченные изменения по edit mode, тестам и документации
+- рабочее дерево чистое после коммита `07b839b`
 
 ### 🔧 Полезные команды
 
@@ -112,20 +113,24 @@ D:\Development\file_compare_codex\dist\FileCompareTC.exe
 
 ### ⏳ Что делать следующим
 
-#### 1. Зафиксировать edit mode в git
-- просмотреть `git status`
-- сделать коммит в `feature/edit-compared-files`
-- при необходимости влить ветку в `main`
+#### 1. Ручная проверка в Total Commander
+- настроить кнопку на `dist\FileCompareTC.exe`
+- использовать параметры `--left-file "%P%N" --right-file "%T%M" --size --date`
+- открыть две UTF-8 text files на левой и правой панели
+- запустить сравнение и убедиться, что кнопка `Edit Mode` активна
+- войти в `Edit Mode`, изменить левый файл, нажать `Save Left`, затем `Recompare`
+- повторить для правого файла через `Save Right`
+- изменить текст и проверить prompt про unsaved changes при `Recompare`
+- изменить текст и проверить prompt про unsaved changes при закрытии окна
+- дополнительно открыть пару, где один файл `UTF-16` или binary, и убедиться, что редактирование недоступно
 
-#### 2. Ручная проверка в Total Commander
-- проверить `Edit Mode` из запуска `--left-file/--right-file`
-- проверить `Save Left` / `Save Right`
-- проверить prompt на unsaved changes при `Recompare`
-- проверить prompt на unsaved changes при закрытии окна
-
-#### 3. Если selection placeholders не сработают
+#### 2. Если selection placeholders не сработают
 - уточнить, какие `%`-параметры поддерживает конкретная сборка Total Commander
 - подогнать строку `Parameters` под эту версию
+
+#### 3. Если ручная проверка успешна
+- влить `feature/edit-compared-files` в `main`
+- при необходимости удалить рабочую ветку
 
 #### 4. Нефункциональные улучшения, если TC-интеграция подтвердится
 - hotkey setup documentation
@@ -136,3 +141,63 @@ D:\Development\file_compare_codex\dist\FileCompareTC.exe
 - редактирование доступно только для `--left-file/--right-file`
 - поддерживаются только UTF-8 text files
 - перед `Recompare`, `Compare` и закрытием окна приложение спрашивает, что делать с несохранёнными изменениями
+
+### 🧪 Шаблон отчёта по ручной проверке в Total Commander
+
+```md
+## Manual TC Check — 2026-03-08
+
+### Environment
+- Total Commander version:
+- Executable used: `dist\FileCompareTC.exe`
+- Button command:
+  `D:\Development\file_compare_codex\dist\FileCompareTC.exe`
+- Button parameters:
+  `--left-file "%P%N" --right-file "%T%M" --size --date`
+
+### Scenario 1: explicit file pair, UTF-8
+- Left file:
+- Right file:
+- Result:
+- `Edit Mode` button state: PASS / FAIL
+- Notes:
+
+### Scenario 2: save left file
+- Change made:
+- `Save Left`: PASS / FAIL
+- File updated on disk: PASS / FAIL
+- `Recompare` after save: PASS / FAIL
+- Notes:
+
+### Scenario 3: save right file
+- Change made:
+- `Save Right`: PASS / FAIL
+- File updated on disk: PASS / FAIL
+- `Recompare` after save: PASS / FAIL
+- Notes:
+
+### Scenario 4: unsaved changes on recompare
+- Prompt shown: PASS / FAIL
+- `Save` path works: PASS / FAIL / NOT TESTED
+- `Discard` path works: PASS / FAIL / NOT TESTED
+- `Cancel` path works: PASS / FAIL / NOT TESTED
+- Notes:
+
+### Scenario 5: unsaved changes on window close
+- Prompt shown: PASS / FAIL
+- `Save` path works: PASS / FAIL / NOT TESTED
+- `Discard` path works: PASS / FAIL / NOT TESTED
+- `Cancel` path works: PASS / FAIL / NOT TESTED
+- Notes:
+
+### Scenario 6: non-UTF-8 or binary file
+- File pair:
+- `Edit Mode` disabled: PASS / FAIL
+- Read-only hint shown: PASS / FAIL
+- Notes:
+
+### Final result
+- Overall: PASS / FAIL
+- Blocking issues:
+- Follow-up tasks:
+```
