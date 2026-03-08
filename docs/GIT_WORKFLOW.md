@@ -2,18 +2,28 @@
 
 ## Current setup
 
-- Local git repository initialized in `d:\Development\file_compare_codex`
-- Default branch: `main`
-- Current baseline commit:
-  `Initial import: file_compare Total Commander tool`
-- Remote repository is not configured yet
+- Local repository: `d:\Development\file_compare_codex`
+- Main integration branch: `main`
+- GitHub remote is the source of truth for `main`
+- Task work happens in short-lived branches
 
-## Branch model
+## Working model
 
-Use a simple workflow:
+Use this workflow consistently:
 
-- `main` contains the latest stable local state
-- each task is done in a separate short-lived branch
+- do not develop directly in local `main`
+- do not merge task branches into local `main`
+- push task branches to GitHub
+- merge into `main` on GitHub via pull request or web merge
+- after GitHub merge, sync local `main` from `origin/main`
+
+In practice:
+
+- local `main` is a sync branch
+- feature work lives only in `feature/...`, `fix/...`, or `docs/...`
+- GitHub `main` is the canonical stable history
+
+## Branch naming
 
 Recommended branch names:
 
@@ -24,10 +34,11 @@ Recommended branch names:
 
 ## Start a new task
 
-Create a branch from `main`:
+Before starting a new task, make sure local `main` is up to date:
 
 ```bash
 git checkout main
+git pull origin main
 git checkout -b feature/<short-task-name>
 ```
 
@@ -35,8 +46,15 @@ Example:
 
 ```bash
 git checkout main
+git pull origin main
 git checkout -b feature/tc-button-polish
 ```
+
+Important rules:
+
+- start a new branch only from updated `main`
+- keep the working tree clean before switching branches
+- if local `main` has accidental commits, do not continue from it until the situation is resolved
 
 ## Daily work
 
@@ -56,7 +74,7 @@ Good commit message examples:
 - `Tighten compare window layout`
 - `Update Total Commander setup docs`
 
-## Before merging back to main
+## Before pushing a task branch
 
 Run the minimum project checks:
 
@@ -71,26 +89,53 @@ If the task also changes packaging or launcher behavior, optionally rebuild:
 powershell -ExecutionPolicy Bypass -File .\scripts\build_exe.ps1
 ```
 
-## Merge completed work
+## Publish the branch to GitHub
 
-If the branch is ready and `main` has not moved:
+Push the task branch and set upstream:
+
+```bash
+git push -u origin feature/<short-task-name>
+```
+
+Example:
+
+```bash
+git push -u origin feature/tc-button-polish
+```
+
+After push:
+
+- open the branch on GitHub
+- create a pull request into `main`
+- merge on GitHub, not locally
+
+## After GitHub merge
+
+Once the branch is merged on GitHub:
 
 ```bash
 git checkout main
-git merge --ff-only feature/<short-task-name>
-```
-
-If `main` has moved and fast-forward is not possible:
-
-```bash
-git checkout main
-git merge --no-ff feature/<short-task-name>
-```
-
-After merge:
-
-```bash
+git pull origin main
 git branch -d feature/<short-task-name>
+```
+
+Optional cleanup of the remote branch:
+
+```bash
+git push origin --delete feature/<short-task-name>
+```
+
+## Rules for `main`
+
+- do not commit directly to `main`
+- do not merge task branches into local `main`
+- use local `main` only to sync from GitHub and create new task branches
+
+If you need to inspect current stable state locally:
+
+```bash
+git checkout main
+git pull origin main
 ```
 
 ## What should not be committed
@@ -111,14 +156,25 @@ Do not commit generated or local-only files:
 
 These are already covered by [`.gitignore`](/d:/Development/file_compare_codex/.gitignore).
 
-## Suggested next step for remote setup
+## Minimal happy path
 
-When you decide to publish the repo later:
+Typical task flow:
 
-1. Create an empty repository in GitHub or GitLab.
-2. Add remote:
-   `git remote add origin <repo-url>`
-3. Push `main` first:
-   `git push -u origin main`
+```bash
+git checkout main
+git pull origin main
+git checkout -b feature/<task>
+git status
+git add <files>
+git commit -m "Short clear message"
+python -m pytest tests -q
+ruff check file_compare tests
+git push -u origin feature/<task>
+```
 
-Until then, keep the repo local and continue using the branch workflow above.
+Then:
+
+1. Create PR on GitHub.
+2. Merge into `main` on GitHub.
+3. Sync local `main`.
+4. Delete the finished branch.
