@@ -68,6 +68,23 @@ If neither side provides selections, the whole directories are compared.
 
 ## Recommended Total Commander Setup
 
+### Single universal button (recommended)
+
+You can configure one command that works for all common scenarios:
+
+```text
+--left-dir "%<Q" --right-dir "%>Q" --left-file "%P%N" --right-file "%T%M" --left-selected-list "%<$L" --right-selected-list "%>$L" --size --date
+```
+
+Mode selection priority for this command:
+
+1. if both selection lists are present, compare selected items;
+2. otherwise compare directories.
+
+Note:
+- if `--left-dir` and `--right-dir` are passed, `--left-file` / `--right-file` are ignored.
+- to force explicit file-pair mode, use a dedicated command without `--left-dir` / `--right-dir`.
+
 ### Menu or button command
 
 - Command: path to `FileCompareTC.exe`

@@ -96,3 +96,29 @@ def test_compare_from_context_rejects_one_sided_explicit_file(left_dir, right_di
 
     with pytest.raises(ValueError):
         compare_from_context(context)
+
+
+def test_compare_from_context_matches_selected_items_by_relative_path_not_position(
+    left_dir,
+    right_dir,
+    create_file,
+):
+    create_file(left_dir / "knopka.md", content="same")
+    create_file(left_dir / "scema.md", content="left-only")
+    create_file(right_dir / "knopka.md", content="same")
+    create_file(right_dir / "PLAN-file-compare.md", content="right-only")
+
+    context = LaunchContext(
+        left_dir=left_dir,
+        right_dir=right_dir,
+        options=ComparisonOptions(compare_size=True, compare_date=False),
+        left_selected=(Path("knopka.md"), Path("scema.md")),
+        right_selected=(Path("knopka.md"), Path("PLAN-file-compare.md")),
+    )
+
+    results = compare_from_context(context)
+    by_rel_path = {str(result.relative_path): result for result in results}
+
+    assert by_rel_path["knopka.md"].category == ComparisonCategory.MATCH
+    assert by_rel_path["scema.md"].category == ComparisonCategory.LEFT_ONLY
+    assert by_rel_path["PLAN-file-compare.md"].category == ComparisonCategory.RIGHT_ONLY
