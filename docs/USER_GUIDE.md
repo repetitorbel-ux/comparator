@@ -180,9 +180,10 @@ CLI launcher поддерживает:
 Правила:
 
 - `--left-file` и `--right-file` должны передаваться вместе;
-- explicit file mode нельзя комбинировать с аргументами каталогов или selection mode;
 - `--left-dir` и `--right-dir` должны передаваться вместе;
 - selection mode требует selections и слева, и справа.
+- если переданы `--left-dir` и `--right-dir`, режим file-pair не используется:
+приложение выбирает selected-items (если есть selections с обеих сторон) или directories.
 
 ## Использование в Total Commander
 
