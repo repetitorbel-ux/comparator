@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import shlex
 import sys
 from pathlib import Path
 from typing import Sequence
@@ -59,7 +60,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def parse_context(argv: Sequence[str] | None = None) -> LaunchContext | None:
     parser = build_parser()
-    args = parser.parse_args(list(argv) if argv is not None else None)
+    raw_args = list(argv) if argv is not None else sys.argv[1:]
+    args = parser.parse_args(_repair_embedded_switch_args(raw_args))
 
     if (
         args.left_file is None
@@ -70,7 +72,10 @@ def parse_context(argv: Sequence[str] | None = None) -> LaunchContext | None:
         return None
 
     if bool(args.left_file) ^ bool(args.right_file):
-        parser.error("--left-file and --right-file must be provided together.")
+        parser.error(
+            "--left-file and --right-file must be provided together. "
+            "For directory compare, use --left-dir and --right-dir."
+        )
 
     if args.left_file is not None and args.right_file is not None:
         if any(
@@ -86,6 +91,24 @@ def parse_context(argv: Sequence[str] | None = None) -> LaunchContext | None:
             parser.error(
                 "Explicit file mode cannot be combined with directory or selection arguments."
             )
+
+        if args.left_file.exists() and args.right_file.exists():
+            if args.left_file.is_dir() and args.right_file.is_dir():
+                return LaunchContext(
+                    left_dir=args.left_file,
+                    right_dir=args.right_file,
+                    options=ComparisonOptions(
+                        recursive=args.recursive,
+                        compare_name=True,
+                        compare_size=args.size,
+                        compare_date=args.date,
+                    ),
+                )
+            if args.left_file.is_dir() ^ args.right_file.is_dir():
+                parser.error(
+                    "Explicit file mode expects file paths on both sides. "
+                    "If you want directory compare, use --left-dir and --right-dir."
+                )
 
         return LaunchContext(
             left_dir=args.left_file.parent,
@@ -179,9 +202,77 @@ def _parse_path_argument(value: str) -> Path:
 
 def _normalize_shell_value(value: str) -> str:
     normalized = value.strip()
-    if len(normalized) >= 2 and normalized[0] == normalized[-1] and normalized[0] in {'"', "'"}:
-        normalized = normalized[1:-1]
-    return normalized.strip()
+    normalized = _trim_embedded_switches(normalized)
+    return normalized.strip().strip('"').strip("'").strip()
+
+
+def _trim_embedded_switches(value: str) -> str:
+    switches = (
+        " --left-file",
+        " --right-file",
+        " --left-dir",
+        " --right-dir",
+        " --recursive",
+        " --size",
+        " --date",
+        " --left-selected",
+        " --right-selected",
+        " --left-selected-list",
+        " --right-selected-list",
+    )
+    cut_positions = [value.find(switch) for switch in switches if value.find(switch) != -1]
+    if not cut_positions:
+        return value
+    return value[: min(cut_positions)].rstrip()
+
+
+def _repair_embedded_switch_args(argv: list[str]) -> list[str]:
+    repaired: list[str] = []
+    for token in argv:
+        repaired.extend(_split_token_with_embedded_switches(token))
+    return repaired
+
+
+def _split_token_with_embedded_switches(token: str) -> list[str]:
+    split_index = _find_first_embedded_switch_index(token)
+    if split_index == -1:
+        return [token]
+
+    head = token[:split_index].rstrip()
+    tail = token[split_index + 1 :].strip()
+
+    tail_tokens = _tokenize_tail(tail)
+    result: list[str] = []
+    if head:
+        result.append(head)
+    for tail_token in tail_tokens:
+        result.extend(_split_token_with_embedded_switches(tail_token))
+    return result
+
+
+def _find_first_embedded_switch_index(value: str) -> int:
+    switches = (
+        " --left-file",
+        " --right-file",
+        " --left-dir",
+        " --right-dir",
+        " --recursive",
+        " --size",
+        " --date",
+        " --left-selected",
+        " --right-selected",
+        " --left-selected-list",
+        " --right-selected-list",
+    )
+    indexes = [value.find(switch) for switch in switches if value.find(switch) != -1]
+    return min(indexes) if indexes else -1
+
+
+def _tokenize_tail(value: str) -> list[str]:
+    try:
+        return shlex.split(value, posix=False)
+    except ValueError:
+        return value.split()
 
 
 def _show_startup_error(message: str) -> None:
