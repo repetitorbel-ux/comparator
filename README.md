@@ -1,70 +1,114 @@
 # File Compare
 
-Utility for comparing directory contents by filename and attributes (size, date, etc.). Based on Python and PySide6.
-This version is focused on Total Commander integration via an external GUI tool.
+`File Compare` это настольная Windows-утилита для сравнения файлов и каталогов.
+Проект написан на Python и PySide6 и в первую очередь рассчитан на запуск как внешнего инструмента из Total Commander.
 
-## Features
-- **Compare by Name**: Find files that exist in both directories or only in one.
-- **Compare by Size**: Identify files with matching names but different sizes.
-- **Recursive Scan**: Architecture supports recursive scanning (currently disabled by default).
-- **GUI**: User-friendly interface with PySide6.
-- **Total Commander Launch Mode**: Start the GUI from Total Commander with panel directories, selected items, or an explicit file pair.
-- **Selection-Aware Compare**: Compare entire directories or only the selected files from both panels.
-- **Side-by-Side Content Diff**: Inspect selected file pairs in a lower split view with aligned lines and highlighted differences.
-- **Extensible**: Strategy pattern allows adding new comparison criteria easily.
+## Что умеет программа
 
-## Installation
+Программа сравнивает левую и правую сторону и показывает результат в виде списка:
+
+- файлы, которые есть с обеих сторон;
+- файлы, которые есть только слева;
+- файлы, которые есть только справа;
+- несовпадения по выбранным критериям.
+
+Поддерживаются такие критерии сравнения:
+
+- имя;
+- размер;
+- дата изменения.
+
+Поддерживаются три основных режима работы:
+
+1. сравнение двух каталогов;
+2. сравнение только выбранных элементов с обеих сторон;
+3. сравнение одной явной пары файлов.
+
+Для явной пары файлов GUI также умеет показывать side-by-side diff содержимого и разрешает редактирование UTF-8 текстовых файлов.
+
+## Основные возможности
+
+- настольный GUI на PySide6;
+- side-by-side diff для выбранной пары файлов;
+- `Edit Mode` для явного сравнения файлов;
+- независимые `Save Left` и `Save Right`;
+- `Recompare` после правок;
+- запрос при несохранённых изменениях перед `Compare`, `Recompare` и закрытием окна;
+- интерфейс на английском и русском;
+- сохранение выбора языка через `QSettings`;
+- launcher-режим для Total Commander;
+- готовый Windows-артефакт `dist\FileCompareTC.exe`.
+
+## Быстрый старт
+
+### Установка окружения
 
 ```bash
 pip install -e ".[dev]"
 ```
 
-## Usage
+### Запуск GUI
 
-### GUI
 ```bash
 file-compare
-# or
+```
+
+Альтернатива:
+
+```bash
 python -m file_compare.gui.main_window
 ```
 
-### TC / CLI Launcher
+### Запуск CLI launcher
+
 ```bash
 file-compare-cli --help
-file-compare-cli --left-dir "D:\Left" --right-dir "D:\Right" --size --date
-file-compare-cli --left-file "D:\Left\a.txt" --right-file "D:\Right\b.txt" --size --date
 ```
 
-When launched with `--left-file` and `--right-file`, the application compares exactly that file pair.
-When launched with `--left-selected` and `--right-selected` values, the application compares only those items.
-For Total Commander setup examples, see [docs/TOTAL_COMMANDER.md](docs/TOTAL_COMMANDER.md).
+Примеры:
 
-## Build EXE
+```bash
+file-compare-cli --left-dir "D:\Left" --right-dir "D:\Right" --size --date
+file-compare-cli --left-file "D:\Left\a.txt" --right-file "D:\Right\b.txt" --size --date
+file-compare-cli --left-dir "D:\Left" --right-dir "D:\Right" --left-selected-list "D:\left.txt" --right-selected-list "D:\right.txt" --size --date
+```
 
-Install dependencies and build:
+## Сборка EXE
 
 ```bash
 pip install -e ".[dev]"
 powershell -ExecutionPolicy Bypass -File .\scripts\build_exe.ps1
 ```
 
-The expected executable name is `FileCompareTC`.
+Ожидаемый результат:
 
-## Development
+- `dist\FileCompareTC.exe`
 
-Branch rule:
-- every new task starts from fresh `main` in a new meaningful branch
-- do not work directly in `main`
+## Документация
 
-Run tests:
+- Руководство пользователя: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
+- Интеграция с Total Commander: [docs/TOTAL_COMMANDER.md](docs/TOTAL_COMMANDER.md)
+- Git workflow: [docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md)
+
+## Проверка
+
+Запуск тестов:
+
 ```bash
-python -m pytest tests/
+python -m pytest tests -q
 ```
 
-Check code style:
+Проверка линтером:
+
 ```bash
 ruff check file_compare tests
 ```
 
-Git workflow reference:
-[docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md)
+## Правило разработки
+
+Не работай напрямую в `main`.
+Каждая новая задача начинается от обновлённого `main` в отдельной ветке.
+
+Полный workflow:
+
+- [docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md)
