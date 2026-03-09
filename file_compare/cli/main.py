@@ -1,21 +1,28 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
+import sys
 from pathlib import Path
 from typing import Sequence
 
 from file_compare.core.session import ComparisonOptions, LaunchContext
 
 
+class _CliArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:  # pragma: no cover - argparse API
+        raise ValueError(message)
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = _CliArgumentParser(
         prog="file-compare-cli",
         description="Launch the File Compare GUI directly or with Total Commander context.",
     )
-    parser.add_argument("--left-file", type=Path, help="Explicit file path from the left panel.")
-    parser.add_argument("--right-file", type=Path, help="Explicit file path from the right panel.")
-    parser.add_argument("--left-dir", type=Path, help="Left panel directory.")
-    parser.add_argument("--right-dir", type=Path, help="Right panel directory.")
+    parser.add_argument("--left-file", type=_parse_path_argument, help="Explicit file path from the left panel.")
+    parser.add_argument("--right-file", type=_parse_path_argument, help="Explicit file path from the right panel.")
+    parser.add_argument("--left-dir", type=_parse_path_argument, help="Left panel directory.")
+    parser.add_argument("--right-dir", type=_parse_path_argument, help="Right panel directory.")
     parser.add_argument(
         "--recursive",
         action="store_true",
@@ -39,12 +46,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--left-selected-list",
-        type=Path,
+        type=_parse_path_argument,
         help="Text file containing left-panel selections, one path per line.",
     )
     parser.add_argument(
         "--right-selected-list",
-        type=Path,
+        type=_parse_path_argument,
         help="Text file containing right-panel selections, one path per line.",
     )
     return parser
@@ -120,11 +127,12 @@ def parse_context(argv: Sequence[str] | None = None) -> LaunchContext | None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    context = parse_context(argv)
     try:
+        context = parse_context(argv)
         return launch_gui(context, argv=argv)
     except ValueError as exc:
-        raise SystemExit(str(exc)) from exc
+        _show_startup_error(str(exc))
+        return 2
 
 
 def launch_gui(context: LaunchContext | None, argv: Sequence[str] | None = None) -> int:
@@ -134,7 +142,7 @@ def launch_gui(context: LaunchContext | None, argv: Sequence[str] | None = None)
 
 
 def _load_selection_values(values: list[str], list_path: Path | None) -> list[str]:
-    loaded_values = [value for value in values if value]
+    loaded_values = [_normalize_shell_value(value) for value in values if value]
     if list_path is None:
         return loaded_values
 
@@ -162,6 +170,26 @@ def _read_selection_file(path: Path) -> list[str]:
         content = raw_bytes.decode("latin-1")
 
     return [line.strip().strip('"') for line in content.splitlines() if line.strip()]
+
+
+def _parse_path_argument(value: str) -> Path:
+    normalized = _normalize_shell_value(value)
+    return Path(normalized)
+
+
+def _normalize_shell_value(value: str) -> str:
+    normalized = value.strip()
+    if len(normalized) >= 2 and normalized[0] == normalized[-1] and normalized[0] in {'"', "'"}:
+        normalized = normalized[1:-1]
+    return normalized.strip()
+
+
+def _show_startup_error(message: str) -> None:
+    full_message = f"File Compare failed to start:\n\n{message}"
+    try:
+        ctypes.windll.user32.MessageBoxW(None, full_message, "File Compare", 0x10)
+    except Exception:
+        print(full_message, file=sys.stderr)
 
 
 if __name__ == "__main__":

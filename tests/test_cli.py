@@ -80,7 +80,7 @@ def test_parse_context_reads_selection_list(temp_dir):
 
 
 def test_parse_context_rejects_one_sided_selection():
-    with pytest.raises(SystemExit):
+    with pytest.raises(ValueError):
         parse_context(
             [
                 "--left-dir",
@@ -94,7 +94,7 @@ def test_parse_context_rejects_one_sided_selection():
 
 
 def test_parse_context_rejects_mixed_file_and_directory_modes():
-    with pytest.raises(SystemExit):
+    with pytest.raises(ValueError):
         parse_context(
             [
                 "--left-file",
@@ -107,3 +107,18 @@ def test_parse_context_rejects_mixed_file_and_directory_modes():
                 r"D:\Right",
             ]
         )
+
+
+def test_parse_context_normalizes_quoted_directory_values():
+    context = parse_context(
+        [
+            "--left-dir",
+            '"left"',
+            "--right-dir",
+            "'right'",
+        ]
+    )
+
+    assert context is not None
+    assert context.left_dir == Path("left")
+    assert context.right_dir == Path("right")
