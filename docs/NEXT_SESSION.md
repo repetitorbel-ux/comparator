@@ -1,6 +1,6 @@
 # Next Session: File Compare
 
-## 📅 Статус на 08.03.2026
+## Статус на 09.03.2026
 
 ### ✅ Что уже реализовано
 1. **Package layout** переведён на `file_compare`.
@@ -20,16 +20,23 @@
    - `--recursive`, `--size`, `--date`
    - `--left-selected`, `--right-selected`
    - `--left-selected-list`, `--right-selected-list`
-5. **Packaging** реализован:
+5. **Локализация GUI** внедрена:
+   - добавлен `file_compare/gui/localization.py` с переводами `en` и `ru`;
+   - язык выбирается через combobox в главном окне;
+   - выбор языка сохраняется через `QSettings`;
+   - стартовый язык определяется по сохранённой настройке, иначе по system locale;
+   - основные GUI-компоненты (`MainWindow`, `CriteriaPanel`, `DirSelector`, `ResultsView`, `ContentCompareView`) умеют `retranslate_ui()` без потери текущего compare state;
+   - локализованы основные статусы, подписи, diff-панель и prompt для unsaved changes.
+6. **Packaging** реализован:
    - `file_compare_tc.spec`
    - `scripts/build_exe.ps1`
    - собран `dist\FileCompareTC.exe`
-6. **Docs** обновлены под сценарий Total Commander.
-7. **Git** инициализирован локально:
+7. **Docs** обновлены под сценарий Total Commander.
+8. **Git** инициализирован локально:
    - основная ветка `main`
    - стартовый snapshot-коммит создан
    - workflow описан в `docs/GIT_WORKFLOW.md`
-8. **Git workflow** приведён к рабочему процессу этой среды:
+9. **Git workflow** приведён к рабочему процессу этой среды:
    - каждая новая задача начинается с новой осмысленно названной ветки
    - основная ветка `main` синхронизируется с GitHub
    - merge на GitHub остаётся основным путём
@@ -46,10 +53,18 @@ ruff check file_compare tests
 ```
 
 Фактический результат:
-- `49 passed`
+- `53 passed`
 - `ruff` без ошибок
-- `PyInstaller` успешно собрал `dist\FileCompareTC.exe`
-- ручная проверка в Total Commander пройдена, edit flow работает корректно
+- локализация GUI проходит smoke-тесты:
+  - авто-выбор `ru` по `ru_RU`
+  - ручное переключение `en`/`ru`
+  - сохранение выбора языка между окнами
+  - prompt unsaved changes использует активный язык
+- `PyInstaller` после i18n-изменений успешно пересобрал `dist\FileCompareTC.exe`
+- предупреждения в `build/file_compare_tc/warn-file_compare_tc.txt` стандартные для Windows-сборки (`pwd`, `grp`, `fcntl`, `posix`) и не выглядят блокирующими
+- CLI parser smoke-check пройден: `--help` работает, explicit file mode корректно собирает `LaunchContext`
+- built `EXE` стартует локально; процесс поднимается без мгновенного падения
+- ручная проверка в Total Commander после i18n-изменений выполнена: запуск и рабочий сценарий подтверждены
 
 ### 📦 Текущее deliverable
 
@@ -58,14 +73,16 @@ ruff check file_compare tests
 dist\FileCompareTC.exe
 ```
 
-Размер на момент фиксации:
-- `47,155,652 bytes`
+Размер последнего известного собранного артефакта:
+- `47,221,466 bytes`
 
 Текущий контекст разработки:
-- ветка: `main`
-- `main` синхронизирован с `origin/main`
-- HEAD: `cd761e6` (`Merge pull request #2 from repetitorbel-ux/docs/add-gh-workflow-commands`)
-- рабочее дерево чистое
+- активная ветка: `feature/gui-language-switch`
+- HEAD: `def2b4e`
+- рабочее дерево НЕ чистое:
+  - изменены GUI-файлы и `tests/test_gui_smoke.py`
+  - добавлен новый файл `file_compare/gui/localization.py`
+  - есть лишний untracked `patch.txt` от служебной попытки патча; перед коммитом не включать его
 
 ### 🔧 Полезные команды
 
@@ -119,10 +136,9 @@ D:\Development\file_compare_codex\dist\FileCompareTC.exe
 
 ### ⏳ Что делать следующим
 
-#### 1. Следующую задачу начинать только с новой ветки
-- перейти на `main`
-- выполнить `git pull origin main`
-- создать новую ветку с осмысленным именем: `feature/...`, `fix/...` или `docs/...`
+#### 1. Завершить ветку `feature/gui-language-switch`
+- проверить diff перед коммитом, особенно `file_compare/gui/localization.py` и `tests/test_gui_smoke.py`
+- после финальной проверки закоммитить i18n-изменения отдельным осмысленным коммитом
 
 #### 2. Если selection placeholders не сработают
 - уточнить, какие `%`-параметры поддерживает конкретная сборка Total Commander
