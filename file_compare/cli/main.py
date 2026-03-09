@@ -1,21 +1,29 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
+import shlex
+import sys
 from pathlib import Path
 from typing import Sequence
 
 from file_compare.core.session import ComparisonOptions, LaunchContext
 
 
+class _CliArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:  # pragma: no cover - argparse API
+        raise ValueError(message)
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = _CliArgumentParser(
         prog="file-compare-cli",
         description="Launch the File Compare GUI directly or with Total Commander context.",
     )
-    parser.add_argument("--left-file", type=Path, help="Explicit file path from the left panel.")
-    parser.add_argument("--right-file", type=Path, help="Explicit file path from the right panel.")
-    parser.add_argument("--left-dir", type=Path, help="Left panel directory.")
-    parser.add_argument("--right-dir", type=Path, help="Right panel directory.")
+    parser.add_argument("--left-file", type=_parse_path_argument, help="Explicit file path from the left panel.")
+    parser.add_argument("--right-file", type=_parse_path_argument, help="Explicit file path from the right panel.")
+    parser.add_argument("--left-dir", type=_parse_path_argument, help="Left panel directory.")
+    parser.add_argument("--right-dir", type=_parse_path_argument, help="Right panel directory.")
     parser.add_argument(
         "--recursive",
         action="store_true",
@@ -39,12 +47,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--left-selected-list",
-        type=Path,
+        type=_parse_path_argument,
         help="Text file containing left-panel selections, one path per line.",
     )
     parser.add_argument(
         "--right-selected-list",
-        type=Path,
+        type=_parse_path_argument,
         help="Text file containing right-panel selections, one path per line.",
     )
     return parser
@@ -52,7 +60,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def parse_context(argv: Sequence[str] | None = None) -> LaunchContext | None:
     parser = build_parser()
-    args = parser.parse_args(list(argv) if argv is not None else None)
+    raw_args = list(argv) if argv is not None else sys.argv[1:]
+    args = parser.parse_args(_repair_embedded_switch_args(raw_args))
 
     if (
         args.left_file is None
@@ -63,7 +72,10 @@ def parse_context(argv: Sequence[str] | None = None) -> LaunchContext | None:
         return None
 
     if bool(args.left_file) ^ bool(args.right_file):
-        parser.error("--left-file and --right-file must be provided together.")
+        parser.error(
+            "--left-file and --right-file must be provided together. "
+            "For directory compare, use --left-dir and --right-dir."
+        )
 
     if args.left_file is not None and args.right_file is not None:
         if any(
@@ -79,6 +91,24 @@ def parse_context(argv: Sequence[str] | None = None) -> LaunchContext | None:
             parser.error(
                 "Explicit file mode cannot be combined with directory or selection arguments."
             )
+
+        if args.left_file.exists() and args.right_file.exists():
+            if args.left_file.is_dir() and args.right_file.is_dir():
+                return LaunchContext(
+                    left_dir=args.left_file,
+                    right_dir=args.right_file,
+                    options=ComparisonOptions(
+                        recursive=args.recursive,
+                        compare_name=True,
+                        compare_size=args.size,
+                        compare_date=args.date,
+                    ),
+                )
+            if args.left_file.is_dir() ^ args.right_file.is_dir():
+                parser.error(
+                    "Explicit file mode expects file paths on both sides. "
+                    "If you want directory compare, use --left-dir and --right-dir."
+                )
 
         return LaunchContext(
             left_dir=args.left_file.parent,
@@ -120,11 +150,12 @@ def parse_context(argv: Sequence[str] | None = None) -> LaunchContext | None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    context = parse_context(argv)
     try:
+        context = parse_context(argv)
         return launch_gui(context, argv=argv)
     except ValueError as exc:
-        raise SystemExit(str(exc)) from exc
+        _show_startup_error(str(exc))
+        return 2
 
 
 def launch_gui(context: LaunchContext | None, argv: Sequence[str] | None = None) -> int:
@@ -134,7 +165,7 @@ def launch_gui(context: LaunchContext | None, argv: Sequence[str] | None = None)
 
 
 def _load_selection_values(values: list[str], list_path: Path | None) -> list[str]:
-    loaded_values = [value for value in values if value]
+    loaded_values = [_normalize_shell_value(value) for value in values if value]
     if list_path is None:
         return loaded_values
 
@@ -162,6 +193,94 @@ def _read_selection_file(path: Path) -> list[str]:
         content = raw_bytes.decode("latin-1")
 
     return [line.strip().strip('"') for line in content.splitlines() if line.strip()]
+
+
+def _parse_path_argument(value: str) -> Path:
+    normalized = _normalize_shell_value(value)
+    return Path(normalized)
+
+
+def _normalize_shell_value(value: str) -> str:
+    normalized = value.strip()
+    normalized = _trim_embedded_switches(normalized)
+    return normalized.strip().strip('"').strip("'").strip()
+
+
+def _trim_embedded_switches(value: str) -> str:
+    switches = (
+        " --left-file",
+        " --right-file",
+        " --left-dir",
+        " --right-dir",
+        " --recursive",
+        " --size",
+        " --date",
+        " --left-selected",
+        " --right-selected",
+        " --left-selected-list",
+        " --right-selected-list",
+    )
+    cut_positions = [value.find(switch) for switch in switches if value.find(switch) != -1]
+    if not cut_positions:
+        return value
+    return value[: min(cut_positions)].rstrip()
+
+
+def _repair_embedded_switch_args(argv: list[str]) -> list[str]:
+    repaired: list[str] = []
+    for token in argv:
+        repaired.extend(_split_token_with_embedded_switches(token))
+    return repaired
+
+
+def _split_token_with_embedded_switches(token: str) -> list[str]:
+    split_index = _find_first_embedded_switch_index(token)
+    if split_index == -1:
+        return [token]
+
+    head = token[:split_index].rstrip()
+    tail = token[split_index + 1 :].strip()
+
+    tail_tokens = _tokenize_tail(tail)
+    result: list[str] = []
+    if head:
+        result.append(head)
+    for tail_token in tail_tokens:
+        result.extend(_split_token_with_embedded_switches(tail_token))
+    return result
+
+
+def _find_first_embedded_switch_index(value: str) -> int:
+    switches = (
+        " --left-file",
+        " --right-file",
+        " --left-dir",
+        " --right-dir",
+        " --recursive",
+        " --size",
+        " --date",
+        " --left-selected",
+        " --right-selected",
+        " --left-selected-list",
+        " --right-selected-list",
+    )
+    indexes = [value.find(switch) for switch in switches if value.find(switch) != -1]
+    return min(indexes) if indexes else -1
+
+
+def _tokenize_tail(value: str) -> list[str]:
+    try:
+        return shlex.split(value, posix=False)
+    except ValueError:
+        return value.split()
+
+
+def _show_startup_error(message: str) -> None:
+    full_message = f"File Compare failed to start:\n\n{message}"
+    try:
+        ctypes.windll.user32.MessageBoxW(None, full_message, "File Compare", 0x10)
+    except Exception:
+        print(full_message, file=sys.stderr)
 
 
 if __name__ == "__main__":

@@ -80,7 +80,7 @@ def test_parse_context_reads_selection_list(temp_dir):
 
 
 def test_parse_context_rejects_one_sided_selection():
-    with pytest.raises(SystemExit):
+    with pytest.raises(ValueError):
         parse_context(
             [
                 "--left-dir",
@@ -94,7 +94,7 @@ def test_parse_context_rejects_one_sided_selection():
 
 
 def test_parse_context_rejects_mixed_file_and_directory_modes():
-    with pytest.raises(SystemExit):
+    with pytest.raises(ValueError):
         parse_context(
             [
                 "--left-file",
@@ -107,3 +107,85 @@ def test_parse_context_rejects_mixed_file_and_directory_modes():
                 r"D:\Right",
             ]
         )
+
+
+def test_parse_context_normalizes_quoted_directory_values():
+    context = parse_context(
+        [
+            "--left-dir",
+            '"left"',
+            "--right-dir",
+            "'right'",
+        ]
+    )
+
+    assert context is not None
+    assert context.left_dir == Path("left")
+    assert context.right_dir == Path("right")
+
+
+def test_parse_context_falls_back_to_directory_mode_when_file_args_are_directories(temp_dir):
+    left_dir = temp_dir / "left"
+    right_dir = temp_dir / "right"
+    left_dir.mkdir()
+    right_dir.mkdir()
+
+    context = parse_context(
+        [
+            "--left-file",
+            str(left_dir),
+            "--right-file",
+            str(right_dir),
+            "--size",
+            "--date",
+        ]
+    )
+
+    assert context is not None
+    assert context.left_dir == left_dir
+    assert context.right_dir == right_dir
+    assert context.left_file is None
+    assert context.right_file is None
+    assert context.options.compare_name is True
+    assert context.options.compare_size is True
+    assert context.options.compare_date is True
+
+
+def test_parse_context_trims_embedded_switches_in_path_value(temp_dir):
+    left_file = temp_dir / "left.txt"
+    right_file = temp_dir / "right.txt"
+    left_file.write_text("left", encoding="utf-8")
+    right_file.write_text("right", encoding="utf-8")
+
+    context = parse_context(
+        [
+            "--left-file",
+            str(left_file),
+            "--right-file",
+            f'{right_file}" --size --date',
+        ]
+    )
+
+    assert context is not None
+    assert context.left_file == left_file
+    assert context.right_file == right_file
+
+
+def test_parse_context_repairs_swallowed_cli_switches_from_tc_directory_values(temp_dir):
+    left_dir = temp_dir / "left"
+    right_dir = temp_dir / "right"
+    left_dir.mkdir()
+    right_dir.mkdir()
+
+    # Simulates a broken TC argv token when a quoted path ends with "\" and swallows next switches.
+    swallowed_token = f'{left_dir}\\ --right-file {right_dir}\\ --size --date'
+    context = parse_context(["--left-file", swallowed_token])
+
+    assert context is not None
+    assert context.left_dir == left_dir
+    assert context.right_dir == right_dir
+    assert context.left_file is None
+    assert context.right_file is None
+    assert context.options.compare_name is True
+    assert context.options.compare_size is True
+    assert context.options.compare_date is True
