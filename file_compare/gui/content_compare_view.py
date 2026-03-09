@@ -28,6 +28,7 @@ from file_compare.core.content_diff import (
     read_text_lines,
 )
 from file_compare.core.models import ComparisonResult
+from file_compare.gui.localization import UiLocalizer
 
 
 class PendingChangesDecision(Enum):
@@ -47,8 +48,9 @@ class _OpenDocumentState:
 class ContentCompareView(QWidget):
     recompare_requested = Signal()
 
-    def __init__(self, parent=None):
+    def __init__(self, localizer: UiLocalizer, parent=None):
         super().__init__(parent)
+        self.localizer = localizer
         self._current_rows: list[DiffRow] = []
         self._diff_row_indexes: list[int] = []
         self._current_diff_position = -1
@@ -58,6 +60,9 @@ class ContentCompareView(QWidget):
         self._in_edit_mode = False
         self._left_doc = _OpenDocumentState()
         self._right_doc = _OpenDocumentState()
+        self._display_mode = "empty"
+        self._single_file_path: Path | None = None
+        self._single_file_missing_side: str | None = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -67,37 +72,37 @@ class ContentCompareView(QWidget):
         controls_layout.setContentsMargins(0, 0, 0, 0)
         controls_layout.setSpacing(4)
 
-        self.edit_mode_btn = QPushButton("Edit Mode")
+        self.edit_mode_btn = QPushButton()
         self.edit_mode_btn.clicked.connect(self.enter_edit_mode)
         self.edit_mode_btn.setMaximumHeight(22)
         controls_layout.addWidget(self.edit_mode_btn)
 
-        self.save_left_btn = QPushButton("Save Left")
+        self.save_left_btn = QPushButton()
         self.save_left_btn.clicked.connect(lambda: self.save_document("left"))
         self.save_left_btn.setMaximumHeight(22)
         controls_layout.addWidget(self.save_left_btn)
 
-        self.save_right_btn = QPushButton("Save Right")
+        self.save_right_btn = QPushButton()
         self.save_right_btn.clicked.connect(lambda: self.save_document("right"))
         self.save_right_btn.setMaximumHeight(22)
         controls_layout.addWidget(self.save_right_btn)
 
-        self.recompare_btn = QPushButton("Recompare")
+        self.recompare_btn = QPushButton()
         self.recompare_btn.clicked.connect(self.recompare_requested.emit)
         self.recompare_btn.setMaximumHeight(22)
         controls_layout.addWidget(self.recompare_btn)
 
-        self.prev_diff_btn = QPushButton("Previous Difference")
+        self.prev_diff_btn = QPushButton()
         self.prev_diff_btn.clicked.connect(self.show_previous_difference)
         self.prev_diff_btn.setMaximumHeight(22)
         controls_layout.addWidget(self.prev_diff_btn)
 
-        self.next_diff_btn = QPushButton("Next Difference")
+        self.next_diff_btn = QPushButton()
         self.next_diff_btn.clicked.connect(self.show_next_difference)
         self.next_diff_btn.setMaximumHeight(22)
         controls_layout.addWidget(self.next_diff_btn)
 
-        self.diff_counter = QLabel("Differences: 0/0")
+        self.diff_counter = QLabel("")
         controls_layout.addWidget(self.diff_counter)
 
         self.edit_status = QLabel("")
@@ -121,8 +126,10 @@ class ContentCompareView(QWidget):
         self.right_path = QLineEdit()
         self.right_path.setReadOnly(True)
         self.right_path.setMaximumHeight(22)
-        header_layout.addWidget(_build_labeled_field("Left:", self.left_path))
-        header_layout.addWidget(_build_labeled_field("Right:", self.right_path))
+        left_field, self.left_field_label = _build_labeled_field("", self.left_path)
+        right_field, self.right_field_label = _build_labeled_field("", self.right_path)
+        header_layout.addWidget(left_field)
+        header_layout.addWidget(right_field)
         layout.addWidget(self.paths_header)
 
         editors_splitter = QSplitter(Qt.Horizontal)
@@ -145,6 +152,32 @@ class ContentCompareView(QWidget):
 
         self.clear_comparison()
 
+    def retranslate_ui(self) -> None:
+        self.edit_mode_btn.setText(self.localizer.tr("content.edit_mode"))
+        self.save_left_btn.setText(self.localizer.tr("content.save_left"))
+        self.save_right_btn.setText(self.localizer.tr("content.save_right"))
+        self.recompare_btn.setText(self.localizer.tr("content.recompare"))
+        self.prev_diff_btn.setText(self.localizer.tr("content.prev_difference"))
+        self.next_diff_btn.setText(self.localizer.tr("content.next_difference"))
+        self.left_field_label.setText(self.localizer.tr("content.left_label"))
+        self.right_field_label.setText(self.localizer.tr("content.right_label"))
+
+        if self._display_mode == "empty":
+            self._set_editor_texts(
+                self.localizer.tr("content.placeholder.select_row"),
+                self.localizer.tr("content.placeholder.select_row"),
+            )
+        elif self._display_mode == "single" and self._single_file_path is not None:
+            if self._single_file_missing_side == "right":
+                self.left_path.setText(str(self._single_file_path))
+                self.right_path.setText(self.localizer.tr("content.missing_right"))
+            else:
+                self.left_path.setText(self.localizer.tr("content.missing_left"))
+                self.right_path.setText(str(self._single_file_path))
+
+        self._update_diff_controls()
+        self._update_edit_controls()
+
     def set_paths_visible(self, visible: bool) -> None:
         self.paths_header.setVisible(visible)
 
@@ -157,11 +190,14 @@ class ContentCompareView(QWidget):
         self._in_edit_mode = False
         self._left_doc = _OpenDocumentState()
         self._right_doc = _OpenDocumentState()
+        self._display_mode = "empty"
+        self._single_file_path = None
+        self._single_file_missing_side = None
         self.left_path.setText("")
         self.right_path.setText("")
         self._set_editor_texts(
-            "Select a compared row to inspect file contents.",
-            "Select a compared row to inspect file contents.",
+            self.localizer.tr("content.placeholder.select_row"),
+            self.localizer.tr("content.placeholder.select_row"),
         )
         self.left_editor.setExtraSelections([])
         self.right_editor.setExtraSelections([])
@@ -189,6 +225,9 @@ class ContentCompareView(QWidget):
 
     def show_file_pair(self, left_path: Path, right_path: Path, *, allow_editing: bool = False) -> None:
         rows = build_side_by_side_rows(left_path, right_path)
+        self._display_mode = "pair"
+        self._single_file_path = None
+        self._single_file_missing_side = None
         self.left_path.setText(str(left_path))
         self.right_path.setText(str(right_path))
         self._configure_pair_editing(left_path, right_path, allow_editing=allow_editing)
@@ -200,6 +239,9 @@ class ContentCompareView(QWidget):
         self._in_edit_mode = False
         self._left_doc = _OpenDocumentState()
         self._right_doc = _OpenDocumentState()
+        self._display_mode = "single"
+        self._single_file_path = file_path
+        self._single_file_missing_side = missing_side
 
         lines = read_text_lines(file_path)
         line_count_width = max(2, len(str(max(len(lines), 1))))
@@ -212,7 +254,7 @@ class ContentCompareView(QWidget):
 
         if missing_side == "right":
             self.left_path.setText(str(file_path))
-            self.right_path.setText("Missing on right side")
+            self.right_path.setText(self.localizer.tr("content.missing_right"))
             self._set_editor_texts(
                 "\n".join(formatted_lines),
                 "\n".join(_format_blank_line(line_count_width) for _ in formatted_lines),
@@ -226,7 +268,7 @@ class ContentCompareView(QWidget):
             self._update_edit_controls()
             return
 
-        self.left_path.setText("Missing on left side")
+        self.left_path.setText(self.localizer.tr("content.missing_left"))
         self.right_path.setText(str(file_path))
         self._set_editor_texts(
             "\n".join(_format_blank_line(line_count_width) for _ in formatted_lines),
@@ -283,8 +325,13 @@ class ContentCompareView(QWidget):
         except OSError as exc:
             QMessageBox.critical(
                 parent or self,
-                "Save Error",
-                f"Unable to save {side} file:\n{document_state.path}\n\n{exc}",
+                self.localizer.tr("content.save_error.title"),
+                self.localizer.tr(
+                    "content.save_error.message",
+                    side=self.localizer.tr(f"content.side.{side}"),
+                    path=document_state.path,
+                    error=exc,
+                ),
             )
             self._update_edit_controls()
             return False
@@ -321,11 +368,14 @@ class ContentCompareView(QWidget):
     ) -> PendingChangesDecision:
         message_box = QMessageBox(parent)
         message_box.setIcon(QMessageBox.Warning)
-        message_box.setWindowTitle("Unsaved Changes")
-        message_box.setText(f"There are unsaved changes. What should happen before {action_name}?")
-        save_button = message_box.addButton("Save", QMessageBox.AcceptRole)
-        discard_button = message_box.addButton("Discard", QMessageBox.DestructiveRole)
-        message_box.addButton("Cancel", QMessageBox.RejectRole)
+        message_box.setWindowTitle(self.localizer.tr("content.unsaved.title"))
+        message_box.setText(self.localizer.tr("content.unsaved.message", action=action_name))
+        save_button = message_box.addButton(self.localizer.tr("content.unsaved.save"), QMessageBox.AcceptRole)
+        discard_button = message_box.addButton(
+            self.localizer.tr("content.unsaved.discard"),
+            QMessageBox.DestructiveRole,
+        )
+        message_box.addButton(self.localizer.tr("content.unsaved.cancel"), QMessageBox.RejectRole)
         message_box.setDefaultButton(save_button)
         message_box.exec()
 
@@ -348,35 +398,17 @@ class ContentCompareView(QWidget):
         self.right_editor.setReadOnly(True)
         self._left_doc = _load_document_state(left_path)
         self._right_doc = _load_document_state(right_path)
-        self._edit_supported = (
-            allow_editing and self._left_doc.editable and self._right_doc.editable
-        )
+        self._edit_supported = allow_editing and self._left_doc.editable and self._right_doc.editable
         self._update_edit_controls()
 
     def _populate_diff_editors(self, rows: list[DiffRow]) -> None:
         self._current_rows = rows
-        self._diff_row_indexes = [
-            line_index for line_index, row in enumerate(rows) if row.kind != DiffKind.EQUAL
-        ]
+        self._diff_row_indexes = [line_index for line_index, row in enumerate(rows) if row.kind != DiffKind.EQUAL]
         self._current_diff_position = 0 if self._diff_row_indexes else -1
         line_count_width = max(
             2,
-            len(
-                str(
-                    max(
-                        (row.left_line_no or 0 for row in rows),
-                        default=0,
-                    )
-                )
-            ),
-            len(
-                str(
-                    max(
-                        (row.right_line_no or 0 for row in rows),
-                        default=0,
-                    )
-                )
-            ),
+            len(str(max((row.left_line_no or 0 for row in rows), default=0))),
+            len(str(max((row.right_line_no or 0 for row in rows), default=0))),
         )
 
         if not rows:
@@ -386,14 +418,8 @@ class ContentCompareView(QWidget):
             self._update_diff_controls()
             return
 
-        left_lines = [
-            _format_line(row.left_line_no, row.left_text, line_count_width)
-            for row in rows
-        ]
-        right_lines = [
-            _format_line(row.right_line_no, row.right_text, line_count_width)
-            for row in rows
-        ]
+        left_lines = [_format_line(row.left_line_no, row.left_text, line_count_width) for row in rows]
+        right_lines = [_format_line(row.right_line_no, row.right_text, line_count_width) for row in rows]
         self._set_editor_texts("\n".join(left_lines), "\n".join(right_lines))
         self.left_editor.setExtraSelections(
             _build_diff_selections(self.left_editor, rows, pane="left", line_no_width=line_count_width)
@@ -409,7 +435,7 @@ class ContentCompareView(QWidget):
         if self._in_edit_mode:
             self.prev_diff_btn.setEnabled(False)
             self.next_diff_btn.setEnabled(False)
-            self.diff_counter.setText("Differences: pending recompare")
+            self.diff_counter.setText(self.localizer.tr("content.diff_counter_pending"))
             return
 
         has_diffs = bool(self._diff_row_indexes)
@@ -417,7 +443,7 @@ class ContentCompareView(QWidget):
         self.next_diff_btn.setEnabled(has_diffs)
         current = self._current_diff_position + 1 if has_diffs and self._current_diff_position >= 0 else 0
         total = len(self._diff_row_indexes)
-        self.diff_counter.setText(f"Differences: {current}/{total}")
+        self.diff_counter.setText(self.localizer.tr("content.diff_counter", current=current, total=total))
 
     def _update_edit_controls(self) -> None:
         left_dirty = self._left_dirty()
@@ -429,11 +455,18 @@ class ContentCompareView(QWidget):
 
         if self._in_edit_mode:
             self.edit_status.setText(
-                f"Mode: Edit | Left: {'modified' if left_dirty else 'saved'} | "
-                f"Right: {'modified' if right_dirty else 'saved'}"
+                self.localizer.tr(
+                    "content.edit_status.mode_edit",
+                    left_state=self.localizer.tr(
+                        "content.edit_state.modified" if left_dirty else "content.edit_state.saved"
+                    ),
+                    right_state=self.localizer.tr(
+                        "content.edit_state.modified" if right_dirty else "content.edit_state.saved"
+                    ),
+                )
             )
         elif self._explicit_pair_mode:
-            self.edit_status.setText("Mode: View")
+            self.edit_status.setText(self.localizer.tr("content.edit_status.mode_view"))
         else:
             self.edit_status.setText("")
 
@@ -441,15 +474,16 @@ class ContentCompareView(QWidget):
             self.edit_hint.setText("")
             return
         if not self._edit_supported:
-            reason = self._left_doc.reason or self._right_doc.reason or "Editing is unavailable for this file pair."
+            reason = self._left_doc.reason or self._right_doc.reason or self.localizer.tr("content.edit_hint.unavailable")
             self.edit_hint.setText(reason)
             return
         if self._in_edit_mode:
-            self.edit_hint.setText("Editing local buffers. Use Recompare to refresh the diff.")
+            self.edit_hint.setText(self.localizer.tr("content.edit_hint.in_progress"))
             return
-        self.edit_hint.setText("Edit mode is available for UTF-8 text files.")
+        self.edit_hint.setText(self.localizer.tr("content.edit_hint.available"))
 
     def _on_editor_text_changed(self, side: str) -> None:
+        del side
         if self._loading_editors:
             return
         if not self._in_edit_mode:
@@ -525,14 +559,15 @@ def _build_editor() -> QPlainTextEdit:
     return editor
 
 
-def _build_labeled_field(label_text: str, field: QLineEdit) -> QWidget:
+def _build_labeled_field(label_text: str, field: QLineEdit) -> tuple[QWidget, QLabel]:
     container = QWidget()
     layout = QHBoxLayout(container)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(4)
-    layout.addWidget(QLabel(label_text))
+    label = QLabel(label_text)
+    layout.addWidget(label)
     layout.addWidget(field)
-    return container
+    return container, label
 
 
 def _format_line(line_no: int | None, text: str, width: int) -> str:
