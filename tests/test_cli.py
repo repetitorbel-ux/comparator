@@ -93,20 +93,67 @@ def test_parse_context_rejects_one_sided_selection():
         )
 
 
-def test_parse_context_rejects_mixed_file_and_directory_modes():
-    with pytest.raises(ValueError):
-        parse_context(
-            [
-                "--left-file",
-                r"D:\Left\a.txt",
-                "--right-file",
-                r"D:\Right\b.txt",
-                "--left-dir",
-                r"D:\Left",
-                "--right-dir",
-                r"D:\Right",
-            ]
-        )
+def test_parse_context_prefers_directory_mode_for_mixed_args_without_selections(temp_dir):
+    left_dir = temp_dir / "left"
+    right_dir = temp_dir / "right"
+    left_dir.mkdir()
+    right_dir.mkdir()
+    left_file = left_dir / "a.txt"
+    right_file = right_dir / "b.txt"
+    left_file.write_text("a", encoding="utf-8")
+    right_file.write_text("b", encoding="utf-8")
+
+    context = parse_context(
+        [
+            "--left-dir",
+            str(left_dir),
+            "--right-dir",
+            str(right_dir),
+            "--left-file",
+            str(left_file),
+            "--right-file",
+            str(right_file),
+        ]
+    )
+
+    assert context is not None
+    assert context.left_file is None
+    assert context.right_file is None
+    assert context.left_dir == left_dir
+    assert context.right_dir == right_dir
+    assert context.options.compare_name is True
+
+
+def test_parse_context_falls_back_from_invalid_dir_tokens_to_file_parents(temp_dir):
+    left_dir = temp_dir / "left"
+    right_dir = temp_dir / "right"
+    left_dir.mkdir()
+    right_dir.mkdir()
+    left_file = left_dir / "knopka.md"
+    right_file = right_dir / "plan.md"
+    left_file.write_text("same", encoding="utf-8")
+    right_file.write_text("same", encoding="utf-8")
+
+    context = parse_context(
+        [
+            "--left-dir",
+            "Q",
+            "--right-dir",
+            "W",
+            "--left-file",
+            str(left_file),
+            "--right-file",
+            str(right_file),
+            "--size",
+            "--date",
+        ]
+    )
+
+    assert context is not None
+    assert context.left_dir == left_dir
+    assert context.right_dir == right_dir
+    assert context.left_file is None
+    assert context.right_file is None
 
 
 def test_parse_context_normalizes_quoted_directory_values():
@@ -122,6 +169,47 @@ def test_parse_context_normalizes_quoted_directory_values():
     assert context is not None
     assert context.left_dir == Path("left")
     assert context.right_dir == Path("right")
+
+
+def test_parse_context_prefers_selected_mode_over_file_mode_for_mixed_args(temp_dir):
+    left_dir = temp_dir / "left"
+    right_dir = temp_dir / "right"
+    left_dir.mkdir()
+    right_dir.mkdir()
+    left_file = left_dir / "knopka.md"
+    right_file = right_dir / "plan.md"
+    left_file.write_text("same", encoding="utf-8")
+    right_file.write_text("diff", encoding="utf-8")
+    (left_dir / "scema.md").write_text("left", encoding="utf-8")
+
+    left_list = temp_dir / "left.txt"
+    right_list = temp_dir / "right.txt"
+    left_list.write_text("knopka.md\nscema.md\n", encoding="utf-8")
+    right_list.write_text("knopka.md\nPLAN-file-compare.md\n", encoding="utf-8")
+
+    context = parse_context(
+        [
+            "--left-dir",
+            str(left_dir),
+            "--right-dir",
+            str(right_dir),
+            "--left-file",
+            str(left_file),
+            "--right-file",
+            str(right_file),
+            "--left-selected-list",
+            str(left_list),
+            "--right-selected-list",
+            str(right_list),
+        ]
+    )
+
+    assert context is not None
+    assert context.left_file is None
+    assert context.right_file is None
+    assert context.left_selected == (Path("knopka.md"), Path("scema.md"))
+    assert context.right_selected == (Path("knopka.md"), Path("PLAN-file-compare.md"))
+    assert context.options.compare_name is True
 
 
 def test_parse_context_falls_back_to_directory_mode_when_file_args_are_directories(temp_dir):

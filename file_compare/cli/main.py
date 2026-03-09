@@ -71,81 +71,86 @@ def parse_context(argv: Sequence[str] | None = None) -> LaunchContext | None:
     ):
         return None
 
-    if bool(args.left_file) ^ bool(args.right_file):
-        parser.error(
-            "--left-file and --right-file must be provided together. "
-            "For directory compare, use --left-dir and --right-dir."
-        )
+    has_dirs = args.left_dir is not None and args.right_dir is not None
+    has_file_pair = args.left_file is not None and args.right_file is not None
 
-    if args.left_file is not None and args.right_file is not None:
-        if any(
-            (
-                args.left_dir is not None,
-                args.right_dir is not None,
-                args.left_selected,
-                args.right_selected,
-                args.left_selected_list is not None,
-                args.right_selected_list is not None,
-            )
-        ):
+    if (args.left_file is None) ^ (args.right_file is None):
+        if not has_dirs:
             parser.error(
-                "Explicit file mode cannot be combined with directory or selection arguments."
+                "--left-file and --right-file must be provided together. "
+                "For directory compare, use --left-dir and --right-dir."
             )
 
-        if args.left_file.exists() and args.right_file.exists():
-            if args.left_file.is_dir() and args.right_file.is_dir():
-                return LaunchContext(
-                    left_dir=args.left_file,
-                    right_dir=args.right_file,
-                    options=ComparisonOptions(
-                        recursive=args.recursive,
-                        compare_name=True,
-                        compare_size=args.size,
-                        compare_date=args.date,
-                    ),
-                )
-            if args.left_file.is_dir() ^ args.right_file.is_dir():
-                parser.error(
-                    "Explicit file mode expects file paths on both sides. "
-                    "If you want directory compare, use --left-dir and --right-dir."
-                )
+    if not has_dirs and not has_file_pair:
+        parser.error("Provide either --left-dir/--right-dir or --left-file/--right-file.")
+
+    if has_dirs:
+        effective_left_dir = _resolve_directory_argument(args.left_dir, args.left_file)
+        effective_right_dir = _resolve_directory_argument(args.right_dir, args.right_file)
+
+        left_selected = tuple(_load_selection_values(args.left_selected, args.left_selected_list))
+        right_selected = tuple(_load_selection_values(args.right_selected, args.right_selected_list))
+
+        if bool(left_selected) ^ bool(right_selected):
+            parser.error(
+                "Selection mode requires both left and right selections. "
+                "Provide selections for both sides or omit them entirely."
+            )
+
+        if left_selected and right_selected:
+            return LaunchContext(
+                left_dir=effective_left_dir,
+                right_dir=effective_right_dir,
+                options=ComparisonOptions(
+                    recursive=args.recursive,
+                    compare_name=True,
+                    compare_size=args.size,
+                    compare_date=args.date,
+                ),
+                left_selected=tuple(Path(item) for item in left_selected),
+                right_selected=tuple(Path(item) for item in right_selected),
+            )
 
         return LaunchContext(
-            left_dir=args.left_file.parent,
-            right_dir=args.right_file.parent,
+            left_dir=effective_left_dir,
+            right_dir=effective_right_dir,
             options=ComparisonOptions(
                 recursive=args.recursive,
-                compare_name=False,
+                compare_name=True,
                 compare_size=args.size,
                 compare_date=args.date,
             ),
-            left_file=args.left_file,
-            right_file=args.right_file,
         )
 
-    if args.left_dir is None or args.right_dir is None:
-        parser.error("--left-dir and --right-dir must be provided together.")
-
-    left_selected = tuple(_load_selection_values(args.left_selected, args.left_selected_list))
-    right_selected = tuple(_load_selection_values(args.right_selected, args.right_selected_list))
-
-    if bool(left_selected) ^ bool(right_selected):
-        parser.error(
-            "Selection mode requires both left and right selections. "
-            "Provide selections for both sides or omit them entirely."
-        )
+    if args.left_file.exists() and args.right_file.exists():
+        if args.left_file.is_dir() and args.right_file.is_dir():
+            return LaunchContext(
+                left_dir=args.left_file,
+                right_dir=args.right_file,
+                options=ComparisonOptions(
+                    recursive=args.recursive,
+                    compare_name=True,
+                    compare_size=args.size,
+                    compare_date=args.date,
+                ),
+            )
+        if args.left_file.is_dir() ^ args.right_file.is_dir():
+            parser.error(
+                "Explicit file mode expects file paths on both sides. "
+                "If you want directory compare, use --left-dir and --right-dir."
+            )
 
     return LaunchContext(
-        left_dir=args.left_dir,
-        right_dir=args.right_dir,
+        left_dir=args.left_file.parent,
+        right_dir=args.right_file.parent,
         options=ComparisonOptions(
             recursive=args.recursive,
-            compare_name=True,
+            compare_name=False,
             compare_size=args.size,
             compare_date=args.date,
         ),
-        left_selected=tuple(Path(item) for item in left_selected),
-        right_selected=tuple(Path(item) for item in right_selected),
+        left_file=args.left_file,
+        right_file=args.right_file,
     )
 
 
@@ -281,6 +286,16 @@ def _show_startup_error(message: str) -> None:
         ctypes.windll.user32.MessageBoxW(None, full_message, "File Compare", 0x10)
     except Exception:
         print(full_message, file=sys.stderr)
+
+
+def _resolve_directory_argument(directory: Path, file_arg: Path | None) -> Path:
+    if directory.exists() and directory.is_dir():
+        return directory
+    if file_arg is not None and file_arg.exists():
+        parent = file_arg.parent
+        if parent.exists() and parent.is_dir():
+            return parent
+    return directory
 
 
 if __name__ == "__main__":
