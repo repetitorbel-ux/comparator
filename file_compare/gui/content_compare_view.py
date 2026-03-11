@@ -24,7 +24,7 @@ from file_compare.core.content_diff import (
     DiffKind,
     DiffRow,
     build_side_by_side_rows,
-    read_editable_text,
+    read_editable_document,
     read_text_lines,
 )
 from file_compare.core.models import ComparisonResult
@@ -43,6 +43,7 @@ class _OpenDocumentState:
     original_text: str = ""
     editable: bool = False
     reason: str = ""
+    encoding: str = "utf-8"
 
 
 class ContentCompareView(QWidget):
@@ -321,7 +322,7 @@ class ContentCompareView(QWidget):
             return True
 
         try:
-            document_state.path.write_text(editor.toPlainText(), encoding="utf-8")
+            document_state.path.write_text(editor.toPlainText(), encoding=document_state.encoding)
         except OSError as exc:
             QMessageBox.critical(
                 parent or self,
@@ -545,10 +546,10 @@ class ContentCompareView(QWidget):
 
 def _load_document_state(path: Path) -> _OpenDocumentState:
     try:
-        text = read_editable_text(path)
+        document = read_editable_document(path)
     except ValueError as exc:
         return _OpenDocumentState(path=path, editable=False, reason=str(exc))
-    return _OpenDocumentState(path=path, original_text=text, editable=True)
+    return _OpenDocumentState(path=path, original_text=document.text, editable=True, encoding=document.encoding)
 
 
 def _build_editor() -> QPlainTextEdit:
@@ -668,3 +669,4 @@ def _color_for_row(kind: DiffKind, *, pane: str) -> QColor | None:
     if kind == DiffKind.RIGHT_ONLY:
         return QColor(245, 245, 250) if pane == "left" else QColor(230, 235, 255)
     return None
+

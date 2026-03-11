@@ -17,7 +17,8 @@ _TRANSLATIONS = {
         "status.comparison_failed": "Comparison failed.",
         "status.unexpected_error": "Unexpected error occurred.",
         "status.comparison_canceled": "Comparison canceled.",
-        "status.comparison_complete": "Comparison complete for {mode}. Found {count} items.",
+        "status.comparison_complete": "Mode: {mode} | Found: {count}",
+        "status.active_mode": "Active mode: {mode}",
         "mode.file_pair": "file pair",
         "mode.selected_items": "selected items",
         "mode.directories": "directories",
@@ -67,7 +68,7 @@ _TRANSLATIONS = {
         "content.edit_state.saved": "saved",
         "content.edit_hint.unavailable": "Editing is unavailable for this file pair.",
         "content.edit_hint.in_progress": "Editing local buffers. Use Recompare to refresh the diff.",
-        "content.edit_hint.available": "Edit mode is available for UTF-8 text files.",
+        "content.edit_hint.available": "Edit mode is available for text files.",
         "content.save_error.title": "Save Error",
         "content.save_error.message": "Unable to save {side} file:\n{path}\n\n{error}",
         "content.side.left": "left",
@@ -92,7 +93,8 @@ _TRANSLATIONS = {
         "status.comparison_failed": "Сравнение завершилось ошибкой.",
         "status.unexpected_error": "Произошла непредвиденная ошибка.",
         "status.comparison_canceled": "Сравнение отменено.",
-        "status.comparison_complete": "Сравнение для режима {mode} завершено. Найдено элементов: {count}.",
+        "status.comparison_complete": "Режим: {mode} | Найдено: {count}",
+        "status.active_mode": "Активный режим: {mode}",
         "mode.file_pair": "пара файлов",
         "mode.selected_items": "выделенные элементы",
         "mode.directories": "каталоги",
@@ -142,7 +144,7 @@ _TRANSLATIONS = {
         "content.edit_state.saved": "сохранен",
         "content.edit_hint.unavailable": "Редактирование недоступно для этой пары файлов.",
         "content.edit_hint.in_progress": "Вы редактируете локальные буферы. Используйте повторное сравнение, чтобы обновить diff.",
-        "content.edit_hint.available": "Режим редактирования доступен только для UTF-8 текстовых файлов.",
+        "content.edit_hint.available": "Режим редактирования доступен для текстовых файлов.",
         "content.save_error.title": "Ошибка сохранения",
         "content.save_error.message": "Не удалось сохранить {side} файл:\n{path}\n\n{error}",
         "content.side.left": "левый",
@@ -193,4 +195,5 @@ class UiLocalizer:
         if text is None:
             text = _TRANSLATIONS["en"].get(key, key)
         return text.format(**kwargs) if kwargs else text
+
 

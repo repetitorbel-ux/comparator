@@ -292,6 +292,8 @@ def _resolve_directory_argument(directory: Path, file_arg: Path | None) -> Path:
     if directory.exists() and directory.is_dir():
         return directory
     if file_arg is not None and file_arg.exists():
+        if file_arg.is_dir():
+            return file_arg
         parent = file_arg.parent
         if parent.exists() and parent.is_dir():
             return parent
@@ -300,3 +302,4 @@ def _resolve_directory_argument(directory: Path, file_arg: Path | None) -> Path:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

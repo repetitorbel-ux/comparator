@@ -25,23 +25,41 @@ class DiffRow:
     right_spans: tuple[tuple[int, int], ...] = ()
 
 
+@dataclass(frozen=True)
+class EditableText:
+    text: str
+    encoding: str
+
+
 def read_text_lines(path: Path) -> list[str]:
     return _decode_for_display(path.read_bytes()).splitlines()
 
 
 def read_editable_text(path: Path) -> str:
+    return read_editable_document(path).text
+
+
+def read_editable_document(path: Path) -> EditableText:
     raw_bytes = path.read_bytes()
-    if raw_bytes.startswith((b"\xff\xfe", b"\xfe\xff")):
-        raise ValueError("Only UTF-8 text files can be edited.")
-    if b"\x00" in raw_bytes:
-        raise ValueError("Binary files are read-only in edit mode.")
 
-    try:
-        content = raw_bytes.decode("utf-8-sig")
-    except UnicodeError as exc:
-        raise ValueError("Only UTF-8 text files can be edited.") from exc
+    if raw_bytes.startswith(b"\xef\xbb\xbf"):
+        encodings = ("utf-8-sig", "utf-8", "cp1251", "cp1252", "latin-1")
+    elif raw_bytes.startswith((b"\xff\xfe", b"\xfe\xff")):
+        encodings = ("utf-16", "utf-8", "cp1251", "cp1252", "latin-1")
+    else:
+        if b"\x00" in raw_bytes:
+            raise ValueError("Binary files are read-only in edit mode.")
+        encodings = ("utf-8", "utf-16", "cp1251", "cp1252", "latin-1")
 
-    return content.replace("\r\n", "\n").replace("\r", "\n")
+    for encoding in encodings:
+        try:
+            content = raw_bytes.decode(encoding)
+            normalized = content.replace("\r\n", "\n").replace("\r", "\n")
+            return EditableText(text=normalized, encoding=encoding)
+        except UnicodeError:
+            continue
+
+    raise ValueError("Unable to decode text file for edit mode.")
 
 
 def build_side_by_side_rows(left_path: Path, right_path: Path) -> list[DiffRow]:
