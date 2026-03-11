@@ -27,12 +27,14 @@ This mode is intended for the common Total Commander button workflow:
 
 The launcher compares exactly those two files.
 
-In GUI, this is also the only mode that enables in-app file editing:
+In GUI, this mode supports in-app file editing, and edit mode is also available when you select a comparable row from directory/selected-items results:
 
 - `Edit Mode` unlocks both text panes for editing
 - `Save Left` and `Save Right` write changes back to disk independently
 - `Recompare` refreshes the diff after saving or discarding local edits
-- editing is available only for UTF-8 text files; non-UTF-8/binary files remain read-only
+- editing is available for text files; binary files remain read-only
+- when only one side exists (`LEFT_ONLY`/`RIGHT_ONLY`), only the existing side is editable
+- saves preserve the original file encoding
 
 Recommended Total Commander button parameters:
 
@@ -100,7 +102,11 @@ Note:
 ## Notes
 
 - Explicit file mode compares exactly one left file and one right file.
-- In-app editing is limited to explicit file mode and UTF-8 text files.
+- In-app editing is available for selected result rows with text content (not binary).
+- Editing is available beyond explicit file mode.
+- For `LEFT_ONLY`/`RIGHT_ONLY`, only the existing side is editable.
+- Save operations preserve original file encoding.
 - Selection mode is symmetric for MVP: selections must exist on both panels or on neither panel.
 - The result always opens in a separate GUI window.
 - The tool compares files only; it does not synchronize, copy, or modify panel contents.
+
