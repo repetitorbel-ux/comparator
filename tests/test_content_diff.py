@@ -21,16 +21,12 @@ def test_read_editable_text_supports_utf8(temp_dir):
     assert read_editable_text(path) == "left\nright\n"
 
 
-def test_read_editable_text_rejects_utf16(temp_dir):
+def test_read_editable_text_supports_utf16(temp_dir):
     path = temp_dir / "utf16.txt"
     path.write_text("hello", encoding="utf-16")
 
-    try:
-        read_editable_text(path)
-    except ValueError as exc:
-        assert str(exc) == "Only UTF-8 text files can be edited."
-    else:  # pragma: no cover - defensive
-        raise AssertionError("Expected ValueError for utf-16 file")
+    assert read_editable_text(path) == "hello"
+
 
 
 def test_read_editable_text_rejects_binary(temp_dir):

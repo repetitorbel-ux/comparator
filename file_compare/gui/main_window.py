@@ -42,6 +42,7 @@ class MainWindow(QMainWindow):
         self._updating_language_selector = False
         self._status_key = "status.ready"
         self._status_kwargs: dict[str, object] = {}
+        self._active_mode_key = "mode.directories"
         self._launch_compare_timer = QTimer(self)
         self._launch_compare_timer.setSingleShot(True)
         self._launch_compare_timer.timeout.connect(self.on_compare)
@@ -102,6 +103,8 @@ class MainWindow(QMainWindow):
 
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
+        self.active_mode_label = QLabel()
+        self.status_bar.addPermanentWidget(self.active_mode_label)
 
         if initial_context is not None:
             self._apply_context(initial_context)
@@ -129,6 +132,7 @@ class MainWindow(QMainWindow):
         self.results_view.retranslate_ui()
         self.content_compare_view.retranslate_ui()
         self._apply_selector_mode(self._launch_selection_context)
+        self._refresh_active_mode_label()
         self._refresh_status_message()
 
     def _set_status_message(self, key: str, **kwargs: object) -> None:
@@ -138,6 +142,21 @@ class MainWindow(QMainWindow):
 
     def _refresh_status_message(self) -> None:
         self.status_bar.showMessage(self.localizer.tr(self._status_key, **self._status_kwargs))
+
+    def _mode_key_for_context(self, context: LaunchContext | None) -> str:
+        if context is None:
+            return "mode.directories"
+        if context.uses_file_pair_mode:
+            return "mode.file_pair"
+        if context.uses_selection_mode:
+            return "mode.selected_items"
+        return "mode.directories"
+
+    def _refresh_active_mode_label(self, context: LaunchContext | None = None) -> None:
+        if context is not None:
+            self._active_mode_key = self._mode_key_for_context(context)
+        mode = self.localizer.tr(self._active_mode_key)
+        self.active_mode_label.setText(self.localizer.tr("status.active_mode", mode=mode))
 
     @Slot()
     def _on_language_changed(self) -> None:
@@ -156,6 +175,7 @@ class MainWindow(QMainWindow):
         self._suppress_path_reset = False
 
     def _apply_selector_mode(self, context: LaunchContext | None) -> None:
+        self._refresh_active_mode_label(context)
         self._suppress_path_reset = True
         try:
             if context is not None and context.uses_file_pair_mode:
@@ -246,17 +266,13 @@ class MainWindow(QMainWindow):
             self.results_view.select_first_row()
         else:
             self.content_compare_view.clear_comparison()
-        if context.uses_file_pair_mode:
-            mode = self.localizer.tr("mode.file_pair")
-        elif context.uses_selection_mode:
-            mode = self.localizer.tr("mode.selected_items")
-        else:
-            mode = self.localizer.tr("mode.directories")
+        self._refresh_active_mode_label(context)
+        mode = self.localizer.tr(self._mode_key_for_context(context))
         self._set_status_message("status.comparison_complete", mode=mode, count=len(results))
 
     @Slot(object)
     def _show_selected_result(self, result) -> None:
-        allow_editing = bool(self._last_compare_context and self._last_compare_context.uses_file_pair_mode)
+        allow_editing = bool(result and result.left and result.right)
         self.content_compare_view.show_result(result, allow_editing=allow_editing)
 
     def closeEvent(self, event: QCloseEvent) -> None:

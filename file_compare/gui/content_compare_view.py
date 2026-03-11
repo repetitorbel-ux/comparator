@@ -24,7 +24,7 @@ from file_compare.core.content_diff import (
     DiffKind,
     DiffRow,
     build_side_by_side_rows,
-    read_editable_text,
+    read_editable_document,
     read_text_lines,
 )
 from file_compare.core.models import ComparisonResult
@@ -43,6 +43,7 @@ class _OpenDocumentState:
     original_text: str = ""
     editable: bool = False
     reason: str = ""
+    encoding: str = "utf-8"
 
 
 class ContentCompareView(QWidget):
@@ -56,6 +57,7 @@ class ContentCompareView(QWidget):
         self._current_diff_position = -1
         self._loading_editors = False
         self._explicit_pair_mode = False
+        self._edit_context_available = False
         self._edit_supported = False
         self._in_edit_mode = False
         self._left_doc = _OpenDocumentState()
@@ -175,6 +177,7 @@ class ContentCompareView(QWidget):
                 self.left_path.setText(self.localizer.tr("content.missing_left"))
                 self.right_path.setText(str(self._single_file_path))
 
+
         self._update_diff_controls()
         self._update_edit_controls()
 
@@ -186,6 +189,7 @@ class ContentCompareView(QWidget):
         self._diff_row_indexes = []
         self._current_diff_position = -1
         self._explicit_pair_mode = False
+        self._edit_context_available = False
         self._edit_supported = False
         self._in_edit_mode = False
         self._left_doc = _OpenDocumentState()
@@ -235,8 +239,11 @@ class ContentCompareView(QWidget):
 
     def show_single_file(self, file_path: Path, *, missing_side: str) -> None:
         self._explicit_pair_mode = False
+        self._edit_context_available = True
         self._edit_supported = False
         self._in_edit_mode = False
+        self.left_editor.setReadOnly(True)
+        self.right_editor.setReadOnly(True)
         self._left_doc = _OpenDocumentState()
         self._right_doc = _OpenDocumentState()
         self._display_mode = "single"
@@ -253,6 +260,8 @@ class ContentCompareView(QWidget):
             formatted_lines = [_format_line(line_no=1, text="", width=line_count_width)]
 
         if missing_side == "right":
+            self._left_doc = _load_document_state(file_path)
+            self._edit_supported = self._left_doc.editable
             self.left_path.setText(str(file_path))
             self.right_path.setText(self.localizer.tr("content.missing_right"))
             self._set_editor_texts(
@@ -268,6 +277,8 @@ class ContentCompareView(QWidget):
             self._update_edit_controls()
             return
 
+        self._right_doc = _load_document_state(file_path)
+        self._edit_supported = self._right_doc.editable
         self.left_path.setText(self.localizer.tr("content.missing_left"))
         self.right_path.setText(str(file_path))
         self._set_editor_texts(
@@ -289,8 +300,8 @@ class ContentCompareView(QWidget):
         self.left_editor.setExtraSelections([])
         self.right_editor.setExtraSelections([])
         self._set_editor_texts(self._left_doc.original_text, self._right_doc.original_text)
-        self.left_editor.setReadOnly(False)
-        self.right_editor.setReadOnly(False)
+        self.left_editor.setReadOnly(not self._left_doc.editable)
+        self.right_editor.setReadOnly(not self._right_doc.editable)
         self._update_diff_controls()
         self._update_edit_controls()
 
@@ -321,7 +332,7 @@ class ContentCompareView(QWidget):
             return True
 
         try:
-            document_state.path.write_text(editor.toPlainText(), encoding="utf-8")
+            document_state.path.write_text(editor.toPlainText(), encoding=document_state.encoding)
         except OSError as exc:
             QMessageBox.critical(
                 parent or self,
@@ -393,6 +404,7 @@ class ContentCompareView(QWidget):
 
     def _configure_pair_editing(self, left_path: Path, right_path: Path, *, allow_editing: bool) -> None:
         self._explicit_pair_mode = allow_editing
+        self._edit_context_available = allow_editing
         self._in_edit_mode = False
         self.left_editor.setReadOnly(True)
         self.right_editor.setReadOnly(True)
@@ -465,12 +477,12 @@ class ContentCompareView(QWidget):
                     ),
                 )
             )
-        elif self._explicit_pair_mode:
+        elif self._edit_context_available:
             self.edit_status.setText(self.localizer.tr("content.edit_status.mode_view"))
         else:
             self.edit_status.setText("")
 
-        if not self._explicit_pair_mode:
+        if not self._edit_context_available:
             self.edit_hint.setText("")
             return
         if not self._edit_supported:
@@ -545,10 +557,10 @@ class ContentCompareView(QWidget):
 
 def _load_document_state(path: Path) -> _OpenDocumentState:
     try:
-        text = read_editable_text(path)
+        document = read_editable_document(path)
     except ValueError as exc:
         return _OpenDocumentState(path=path, editable=False, reason=str(exc))
-    return _OpenDocumentState(path=path, original_text=text, editable=True)
+    return _OpenDocumentState(path=path, original_text=document.text, editable=True, encoding=document.encoding)
 
 
 def _build_editor() -> QPlainTextEdit:
@@ -668,3 +680,22 @@ def _color_for_row(kind: DiffKind, *, pane: str) -> QColor | None:
     if kind == DiffKind.RIGHT_ONLY:
         return QColor(245, 245, 250) if pane == "left" else QColor(230, 235, 255)
     return None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -277,3 +277,30 @@ def test_parse_context_repairs_swallowed_cli_switches_from_tc_directory_values(t
     assert context.options.compare_name is True
     assert context.options.compare_size is True
     assert context.options.compare_date is True
+
+def test_parse_context_uses_directory_file_args_when_dir_tokens_are_invalid(temp_dir):
+    root = temp_dir / "root"
+    left_dir = root / "1"
+    right_dir = root / "2"
+    left_dir.mkdir(parents=True)
+    right_dir.mkdir(parents=True)
+
+    context = parse_context(
+        [
+            "--left-dir",
+            "Q",
+            "--right-dir",
+            "W",
+            "--left-file",
+            str(left_dir),
+            "--right-file",
+            str(right_dir),
+        ]
+    )
+
+    assert context is not None
+    assert context.left_dir == left_dir
+    assert context.right_dir == right_dir
+    assert context.left_file is None
+    assert context.right_file is None
+    assert context.options.compare_name is True

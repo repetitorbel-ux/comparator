@@ -81,6 +81,7 @@ def test_main_window_accepts_context(temp_dir):
     assert window.criteria_panel.name_cb.isChecked() is True
     assert window.paths_row.isHidden() is False
     assert window.content_compare_view.paths_header.isHidden() is False
+    assert window.active_mode_label.text() == "Active mode: directories"
     window.close()
     del app
 
@@ -114,6 +115,7 @@ def test_main_window_shows_file_labels_for_explicit_file_mode(left_dir, right_di
     assert window.criteria_panel.name_cb.isEnabled() is True
     assert window.criteria_panel.name_cb.isChecked() is False
     assert window.content_compare_view.paths_header.isHidden() is False
+    assert window.active_mode_label.text() == "Active mode: file pair"
 
     window.close()
     del app
@@ -342,7 +344,7 @@ def test_content_compare_view_cancel_keeps_unsaved_changes(
     del app
 
 
-def test_non_utf8_file_pair_stays_read_only(
+def test_non_utf8_file_pair_can_be_edited_and_saved_in_original_encoding(
     left_dir,
     right_dir,
     temp_dir,
@@ -363,11 +365,17 @@ def test_non_utf8_file_pair_stays_read_only(
     window = MainWindow(initial_context=context, localizer=make_localizer(temp_dir))
     app.processEvents()
 
-    assert window.content_compare_view.edit_mode_btn.isEnabled() is False
-    assert "UTF-8" in window.content_compare_view.edit_hint.text()
+    assert window.content_compare_view.edit_mode_btn.isEnabled() is True
+    window.content_compare_view.enter_edit_mode()
+    window.content_compare_view.left_editor.setPlainText("updated")
+    app.processEvents()
+
+    assert window.content_compare_view.save_document("left", window) is True
+    assert left_file.read_text(encoding="utf-16") == "updated"
 
     window.close()
     del app
+
 
 
 def test_language_switch_updates_visible_gui_texts_and_preserves_compare_state(
@@ -401,6 +409,7 @@ def test_language_switch_updates_visible_gui_texts_and_preserves_compare_state(
     assert window.criteria_panel.size_cb.text() == "Размер"
     assert window.results_view.model().headerData(1, Qt.Horizontal) == "Состояние"
     assert window.content_compare_view.edit_mode_btn.text() == "Режим редактирования"
+    assert window.active_mode_label.text() == "Активный режим: пара файлов"
     assert window.content_compare_view.diff_counter.text() == "Отличия: 1/1"
     assert window.content_compare_view.left_path.text() == str(left_file)
     assert window.content_compare_view.right_path.text() == str(right_file)
@@ -475,3 +484,62 @@ def test_unsaved_changes_prompt_uses_active_language(
     window.close()
     del app
 
+def test_directory_mode_selected_pair_allows_edit_mode(
+    left_dir,
+    right_dir,
+    create_file,
+    temp_dir,
+):
+    app = QApplication.instance() or QApplication([])
+    create_file(left_dir / "same.txt", content="left")
+    create_file(right_dir / "same.txt", content="right-right")
+
+    context = LaunchContext(
+        left_dir=left_dir,
+        right_dir=right_dir,
+        options=ComparisonOptions(compare_size=True),
+    )
+    window = MainWindow(initial_context=context, localizer=make_localizer(temp_dir))
+    app.processEvents()
+
+    window.results_view.select_first_row()
+    app.processEvents()
+
+    assert window.content_compare_view.edit_mode_btn.isEnabled() is True
+    window.content_compare_view.enter_edit_mode()
+    app.processEvents()
+    assert window.content_compare_view.left_editor.isReadOnly() is False
+    assert window.content_compare_view.right_editor.isReadOnly() is False
+
+    window.close()
+    del app
+
+def test_directory_mode_row_with_missing_side_allows_edit_for_existing_file(
+    left_dir,
+    right_dir,
+    create_file,
+    temp_dir,
+):
+    app = QApplication.instance() or QApplication([])
+    create_file(left_dir / "a-left-only.txt", content="left")
+    create_file(right_dir / "z-right-only.txt", content="right")
+
+    context = LaunchContext(
+        left_dir=left_dir,
+        right_dir=right_dir,
+        options=ComparisonOptions(),
+    )
+    window = MainWindow(initial_context=context, localizer=make_localizer(temp_dir))
+    app.processEvents()
+
+    window.results_view.selectRow(0)
+    app.processEvents()
+
+    assert window.content_compare_view.edit_mode_btn.isEnabled() is True
+    window.content_compare_view.enter_edit_mode()
+    app.processEvents()
+    assert window.content_compare_view.left_editor.isReadOnly() is False
+    assert window.content_compare_view.right_editor.isReadOnly() is True
+
+    window.close()
+    del app
