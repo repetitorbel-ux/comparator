@@ -513,3 +513,31 @@ def test_directory_mode_selected_pair_allows_edit_mode(
 
     window.close()
     del app
+
+def test_directory_mode_row_with_missing_side_disables_edit_mode(
+    left_dir,
+    right_dir,
+    create_file,
+    temp_dir,
+):
+    app = QApplication.instance() or QApplication([])
+    create_file(left_dir / "a-left-only.txt", content="left")
+    create_file(right_dir / "z-right-only.txt", content="right")
+
+    context = LaunchContext(
+        left_dir=left_dir,
+        right_dir=right_dir,
+        options=ComparisonOptions(),
+    )
+    window = MainWindow(initial_context=context, localizer=make_localizer(temp_dir))
+    app.processEvents()
+
+    window.results_view.selectRow(0)
+    app.processEvents()
+
+    assert window.content_compare_view.edit_mode_btn.isEnabled() is False
+    assert window.content_compare_view.left_editor.isReadOnly() is True
+    assert window.content_compare_view.right_editor.isReadOnly() is True
+
+    window.close()
+    del app
